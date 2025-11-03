@@ -80,8 +80,34 @@ def print_examples_for(file_name, max_examples=3):
 
 def main():
 	files = ["test.json", "valid.json", "train.json"]
+
+	# Print a single example from the first available file (prefer test.json)
+	example_printed = False
 	for fn in files:
-		print_examples_for(fn, max_examples=2)
+		path = DATA_DIR / fn
+		exs = read_jsonl(path, max_examples=1)
+		if exs:
+			ex = exs[0]
+			print(f"\n--- Example (from {fn}) ---")
+			print(f"Summary: {summarize_record(ex)}")
+			print(json.dumps(ex, indent=2, ensure_ascii=False))
+			example_printed = True
+			break
+	if not example_printed:
+		print("\n(No example found — none of test.json / valid.json / train.json exist or contain records.)")
+
+	# Now print counts for each split
+	print("\n--- Dataset counts ---")
+	for fn in files:
+		path = DATA_DIR / fn
+		count = 0
+		if path.exists():
+			# count non-empty lines (attempt to ignore blank lines)
+			with path.open("r", encoding="utf-8") as f:
+				for line in f:
+					if line.strip():
+						count += 1
+		print(f"{fn}: {count}")
 
 
 if __name__ == "__main__":
