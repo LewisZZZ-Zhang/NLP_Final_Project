@@ -47,9 +47,9 @@ Desktop.ini
 # Keep the `out/` directory in the repo but ignore any files inside it.
 # `.gitkeep` is allowed so the empty directory can be tracked.
 /out/*
-# !/out/.gitkeep
+!/out/.gitkeep
 
 # /data/*
-# !/data/.gitkeep
+!/data/.gitkeep
 /data/NYTRED/*
-# !/data/NYTRED/.gitkeep
+!/data/NYTRED/.gitkeep
