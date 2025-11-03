@@ -1,4 +1,7 @@
-#!/usr/bin/env python3
+'''
+python3 data_example.py | sed -n '1,200p' > out/example.txt
+'''
+
 """washdata.py
 
 Small helper to print example records from the dataset files in `data/`.
@@ -79,7 +82,8 @@ def print_examples_for(file_name, max_examples=3):
 
 
 def main():
-	files = ["test.json", "valid.json", "train.json"]
+	# prefer showing train first, then valid, then test
+	files = ["train.json", "valid.json", "test.json"]
 
 	# Print a single example from the first available file (prefer test.json)
 	example_printed = False
@@ -108,6 +112,85 @@ def main():
 					if line.strip():
 						count += 1
 		print(f"{fn}: {count}")
+
+	# Collect all relation labels across the splits and count frequencies
+	rel_counts = {}
+	# Also collect per-file relation counts
+	rel_counts_per_file = {fn: {} for fn in files}
+	for fn in files:
+		path = DATA_DIR / fn
+		if not path.exists():
+			continue
+		with path.open("r", encoding="utf-8") as f:
+			for line in f:
+				if not line.strip():
+					continue
+				try:
+					rec = json.loads(line)
+				except json.JSONDecodeError:
+					continue
+				for rm in rec.get("relationMentions", []) or []:
+					label = rm.get("label")
+					if not label:
+						continue
+					rel_counts[label] = rel_counts.get(label, 0) + 1
+					rel_counts_per_file[fn][label] = rel_counts_per_file[fn].get(label, 0) + 1
+
+	print("\n--- Relation types (combined label: count) ---")
+	if not rel_counts:
+		print("(no relation labels found)")
+	else:
+		# sort labels by frequency descending then alphabetically
+		labels_sorted = sorted(rel_counts.items(), key=lambda kv: (-kv[1], kv[0]))
+		# compute column widths for neat alignment
+		max_label = max(len(lbl) for lbl, _ in labels_sorted)
+		max_total = max(len(str(cnt)) for _, cnt in labels_sorted)
+		# widths for per-file counts
+		def max_width_for(fn):
+			return max((len(str(rel_counts_per_file.get(fn, {}).get(lbl, 0))) for lbl, _ in labels_sorted), default=1)
+		max_a = max_width_for("test.json")
+		max_b = max_width_for("valid.json")
+		max_c = max_width_for("train.json")
+
+		# show decomposition order once and print compact aligned columns
+		# compute widths for numeric columns
+		max_cnt_w = max(len(str(cnt)) for _, cnt in labels_sorted)
+		max_a_w = max(len(str(rel_counts_per_file.get("test.json", {}).get(lbl, 0))) for lbl, _ in labels_sorted)
+		max_b_w = max(len(str(rel_counts_per_file.get("valid.json", {}).get(lbl, 0))) for lbl, _ in labels_sorted)
+		max_c_w = max(len(str(rel_counts_per_file.get("train.json", {}).get(lbl, 0))) for lbl, _ in labels_sorted)
+
+		# header row (dynamic based on files order)
+		file_stems = [Path(fn).stem for fn in files]
+		max_file_ws = [
+			max(len(str(rel_counts_per_file.get(fn, {}).get(lbl, 0))) for lbl, _ in labels_sorted)
+			for fn in files
+		]
+		header_parts = [f"{'total':>{max_cnt_w}}"] + [f"{stem:>{w+1}}" for stem, w in zip(file_stems, max_file_ws)] + ["  label"]
+		print(" ".join(header_parts))
+		for label, cnt in labels_sorted:
+			vals = [rel_counts_per_file.get(fn, {}).get(label, 0) for fn in files]
+			vals_parts = [f"{cnt:>{max_cnt_w}}"] + [f"{v:>{w+1}}" for v, w in zip(vals, max_file_ws)]
+			print(" ".join(vals_parts) + f"  {label}")
+		print(f"\nTotal distinct relation labels (combined): {len(rel_counts)}")
+
+	# Print per-split relation counts (aligned, numeric first)
+	print("\n--- Per-split relation counts ---")
+	for fn in files:
+		print(f"\n[{fn}]")
+		per = rel_counts_per_file.get(fn, {})
+		if not per:
+			print("(no relation labels found or file missing)")
+			continue
+		# sort by frequency desc then label
+		per_sorted = sorted(per.items(), key=lambda kv: (-kv[1], kv[0]))
+		# compute widths
+		max_cnt_w = max(len(str(cnt)) for _, cnt in per_sorted)
+		max_label_w = max(len(lbl) for lbl, _ in per_sorted)
+		# header
+		print(f"{'count':>{max_cnt_w}}  label")
+		for label, cnt in per_sorted:
+			print(f"{cnt:>{max_cnt_w}}  {label}")
+		print(f"Total distinct relation labels in {fn}: {len(per)}")
 
 
 if __name__ == "__main__":
