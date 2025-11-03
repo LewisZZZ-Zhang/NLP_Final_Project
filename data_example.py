@@ -1,5 +1,6 @@
 '''
-python3 data_example.py | sed -n '1,200p' > out/example.txt
+Run and save output safely:
+	python3 data_example.py > out/example.txt
 '''
 
 """washdata.py
@@ -21,7 +22,8 @@ from pathlib import Path
 import sys
 
 
-DATA_DIR = Path(__file__).resolve().parent / "data" / "NTYRED"
+# Dataset lives under data/NYTRED according to README.txt
+DATA_DIR = Path(__file__).resolve().parent / "data" / "NYTRED"
 
 
 def read_jsonl(path, max_examples=3):

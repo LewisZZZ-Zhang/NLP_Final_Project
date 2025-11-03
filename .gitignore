@@ -49,6 +49,9 @@ Desktop.ini
 /out/*
 !/out/.gitkeep
 
+/tmp/*
+!/tmp/.gitkeep
+
 # /data/*
 !/data/.gitkeep
 /data/NYTRED/*
