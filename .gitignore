@@ -9,7 +9,6 @@
 
 /dist
 /build
-/out
 *.exe
 *.dll
 *.obj
