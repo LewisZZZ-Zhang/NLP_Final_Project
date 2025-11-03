@@ -21,7 +21,7 @@ from pathlib import Path
 import sys
 
 
-DATA_DIR = Path(__file__).resolve().parent / "data"
+DATA_DIR = Path(__file__).resolve().parent / "data" / "NTYRED"
 
 
 def read_jsonl(path, max_examples=3):
