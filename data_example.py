@@ -1,6 +1,7 @@
 '''
 Run and save output safely:
 	python3 data_example.py > out/example.txt
+	python3 data_example.py | tee out/example.txt
 '''
 
 """washdata.py
