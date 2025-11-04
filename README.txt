@@ -6,3 +6,8 @@ https://www.kaggle.com/datasets/daishinkan002/new-york-times-relation-extraction
 │       ├── test.json
 │       ├── train.json
 │       └── valid.json
+
+
+关于数据集 可以参考 https://github.com/iesl/state-change-re 
+这里面都是已经人工标注好的关系实体 大致结构为{doc_id:, sentence_id: entity:},
+对应的文件需自行下载。
