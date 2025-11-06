@@ -8,6 +8,29 @@ https://www.kaggle.com/datasets/daishinkan002/new-york-times-relation-extraction
 │       └── valid.json
 
 
-关于数据集 可以参考 https://github.com/iesl/state-change-re 
-这里面都是已经人工标注好的关系实体 大致结构为{doc_id:, sentence_id: entity:},
-对应的文件需自行下载。
+数据集2 arnor_dataset-2.0.0 
+https://github.com/PaddlePaddle/Research/blob/master/NLP/ACL2019-ARNOR/README.md
+该数据集为论文模型ARNOR所使用的训练集的优化版本， 特点是在test数据集中直接存在手动标记的is_nosie标签
+可以用于直接测试attention block过滤噪声的能力。
+以下附有数据结构：
+{
+    "sentText": "The source sentence text",
+    "relationMentions": [
+                            {
+                                "em1Text": "The first entity in relation",
+                                "em2Text": "The second entity in relation",
+                                "label": "Relation label",
+                                "is_noise": false # only occur in test set
+                            },
+                            ...
+                        ],
+    "entityMentions":   [
+                            {
+                                "text": "Entity words",
+                                "label": "Entity type",
+                                ...
+                            },
+                            ...
+                        ]
+    ...
+}
