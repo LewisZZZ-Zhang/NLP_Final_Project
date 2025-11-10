@@ -34,3 +34,14 @@ https://github.com/PaddlePaddle/Research/blob/master/NLP/ACL2019-ARNOR/README.md
                         ]
     ...
 }
+
+Citation
+@inproceedings{han-etal-2019-opennre,
+    title = "{O}pen{NRE}: An Open and Extensible Toolkit for Neural Relation Extraction",
+    author = "Han, Xu and Gao, Tianyu and Yao, Yuan and Ye, Deming and Liu, Zhiyuan and Sun, Maosong",
+    booktitle = "Proceedings of EMNLP-IJCNLP: System Demonstrations",
+    year = "2019",
+    url = "https://www.aclweb.org/anthology/D19-3029",
+    doi = "10.18653/v1/D19-3029",
+    pages = "169--174"
+}
