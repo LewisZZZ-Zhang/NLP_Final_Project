@@ -35,6 +35,17 @@ https://github.com/PaddlePaddle/Research/blob/master/NLP/ACL2019-ARNOR/README.md
     ...
 }
 
+
+How to run OpenNRE:
+--Environment Preparation
+pip install -r requirements.txt
+python setup.py install
+
+--Downloading the dataset
+cd benchmark
+bash download_nyt10m.sh
+
+
 Citation
 @inproceedings{han-etal-2019-opennre,
     title = "{O}pen{NRE}: An Open and Extensible Toolkit for Neural Relation Extraction",

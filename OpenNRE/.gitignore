@@ -128,3 +128,6 @@ benchmark/tacred
 
 # package
 opennre-egg.info
+
+# datasets
+*.txt
