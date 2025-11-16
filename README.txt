@@ -45,6 +45,19 @@ python setup.py install
 cd benchmark
 bash download_nyt10m.sh
 
+Training:
+python3 example/train_bag_cnn.py \
+    --metric auc \
+    --dataset nyt10m \
+    --batch_size 160 \
+    --lr 0.1 \
+    --weight_decay 1e-5 \
+    --max_epoch 100 \
+    --max_length 128 \
+    --seed 42 \
+    --encoder pcnn \
+    --aggr att
+
 
 Citation
 @inproceedings{han-etal-2019-opennre,
