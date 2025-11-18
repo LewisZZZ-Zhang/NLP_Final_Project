@@ -24,7 +24,7 @@ or with explicit paths:
 import json
 import argparse
 import re
-from collections import OrderedDict
+from collections import OrderedDict, defaultdict
 
 
 def find_span(sentence, entity_text):
@@ -83,6 +83,8 @@ def convert_file(input_path, out_path, rel2id_path):
     rels['NA'] = None
 
     out_lines = []
+    # noise_counts[relation] = {'true': int, 'false': int}
+    noise_counts = defaultdict(lambda: {'true': 0, 'false': 0})
     with open(input_path, 'r', encoding='utf-8') as rf:
         for raw in rf:
             raw = raw.strip()
@@ -130,6 +132,11 @@ def convert_file(input_path, out_path, rel2id_path):
                     'is_noise': bool(is_noise)
                 }
                 out_lines.append(item)
+                # update noise counts for this relation label
+                if bool(is_noise):
+                    noise_counts[label]['true'] += 1
+                else:
+                    noise_counts[label]['false'] += 1
                 if label not in rels:
                     rels[label] = None
 
@@ -152,6 +159,21 @@ def convert_file(input_path, out_path, rel2id_path):
 
     with open(rel2id_path, 'w', encoding='utf-8') as rf:
         json.dump(rel2id, rf, indent=2, ensure_ascii=False)
+
+    # write noise statistics summary
+    noise_stats_path = rel2id_path.replace('_rel2id.json', '_noise_stats.json')
+    try:
+        with open(noise_stats_path, 'w', encoding='utf-8') as nsf:
+            json.dump(noise_counts, nsf, indent=2, ensure_ascii=False)
+        print(f"Wrote noise stats to {noise_stats_path}")
+    except Exception:
+        # If writing fails, still print summary
+        noise_stats_path = None
+
+    # print a concise summary to stdout
+    print("Noise counts per relation:")
+    for r in sorted(noise_counts.keys()):
+        print(f"  {r}: true={noise_counts[r]['true']}, false={noise_counts[r]['false']}")
 
     print(f"Wrote {len(out_lines)} examples to {out_path}")
     print(f"Wrote {len(rel2id)} relations to {rel2id_path}")
