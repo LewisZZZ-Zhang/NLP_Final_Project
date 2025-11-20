@@ -58,3 +58,8 @@ Desktop.ini
 !/data/NYTRED/.gitkeep
 /data/nyt10
 /data/nyt10m
+OpenNRE/benchmark/arnor_noise_stats.json
+data/arnor_dataset-2.0.0/train.json
+data/arnor_dataset-2.0.0/test_noise.json
+data/arnor_dataset-2.0.0/test.json
+data/arnor_dataset-2.0.0/dev.json
