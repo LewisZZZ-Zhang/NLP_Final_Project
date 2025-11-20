@@ -121,3 +121,11 @@ bash download_nyt10m.sh
 | 训练／验证集设置              | 原始训练集为远监督构造；没有专门人工清洗验证集。([cse.iitd.ac.in][3])              | 鼓励有验证集，并且关系类别在训练与测试之间保持一致性。([akbc.ws][2])                           |
 | 任务目标（适用性）            | 更“经典”、大规模，但噪声更多，测试集可能更偏向 “held-out” 远监督情境。              | 更严格用于评测：测试集人工标注，更适合作为“高质量”benchmark。                                  |
 | 推荐使用场景                 | 若你想使用大规模数据训练，探索模型在大量远监督实例上的表现。                         | 若你想做模型评估、benchmark 比较、追求更可靠的评价结果。                                     |
+
+
+python3 filter/main.py --split train --limit-bags 5 --policy topk --topk 1 --output tmp/nyt10m_train_filtered_sample.txt
+
+in main:
+Implemented a standalone NYT10m filter CLI (filter/main.py) that mirrors the proposal’s attention-filter stage. It reads a split (nyt10m_train/val/test.txt), groups sentences into bags by (relation, head_id, tail_id), and assigns each sentence a heuristic attention score using relation-specific lexical cues, entity distance, and context-based features to mimic attention weights.
+Added three filtering policies covering the proposal’s strategies—absolute threshold, top‑k, and relative margin—with a guaranteed minimum number of kept sentences per bag plus hooks to ingest external attention files. The tool writes a new JSONL split (optionally with attention scores embedded) and reports per-relation statistics so you can compare pre/post bag sizes and removal rates.
+CLI options expose dataset paths, policy parameters, temperature, bag limits for debugging, and JSON summary output, making it easy to iterate on filter settings before retraining OpenNRE models.
