@@ -56,4 +56,3 @@ Desktop.ini
 !/data/.gitkeep
 /data/NYTRED/*
 !/data/NYTRED/.gitkeep
-*.json
