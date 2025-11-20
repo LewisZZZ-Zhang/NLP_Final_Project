@@ -112,7 +112,9 @@ cd data
 bash download_nyt10.sh
 bash download_nyt10m.sh
 
-数据集说明：（https://opennre-docs.readthedocs.io/en/latest/get_started/benchmark.html#bag-level-relation-extraction）
+数据集说明：
+（https://github.com/thunlp/OpenNRE.git）
+（https://opennre-docs.readthedocs.io/en/latest/get_started/benchmark.html#bag-level-relation-extraction）
 | 项目                        | NYT10                                                                      | NYT10m                                                                                |
 | -------------------------- | ---------------------------------------------------------------------------| ------------------------------------------------------------------------------------- |
 | 关系类别数 (#class)          | 53 个关系类别。([opennre-docs.readthedocs.io][1])                            | 25 个关系类别。([akbc.ws][2])                                                           |
