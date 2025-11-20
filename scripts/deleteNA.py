@@ -3,7 +3,7 @@ import json
 # 输入文件路径
 input_file = "data/arnor_test.txt"
 # 输出文件路径
-output_file = "data/arnor_test_filtered.txt"
+output_file = "data/arnor_test_without_NA.txt"
 
 def filter_na_relations(input_path, output_path):
     with open(input_path, "r", encoding="utf-8") as infile, open(output_path, "w", encoding="utf-8") as outfile:
