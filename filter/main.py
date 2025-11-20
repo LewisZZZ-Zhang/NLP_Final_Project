@@ -566,13 +566,63 @@ class RelativeMarginPolicy(FilterPolicy):
         return mask
 
 
+class DropBottomPolicy(FilterPolicy):
+    def __init__(self, drop_k: int, min_keep: int = 1):
+        super().__init__(min_keep)
+        self.drop_k = max(0, drop_k)
+
+    def select(self, scores: Sequence[float]) -> List[bool]:
+        n = len(scores)
+        if n == 0:
+            return []
+        keep = [True] * n
+        if self.drop_k <= 0:
+            return keep
+        max_drop = max(0, n - self.min_keep)
+        drop_count = min(self.drop_k, max_drop)
+        if drop_count == 0:
+            return keep
+        bottom_idx = sorted(range(n), key=lambda i: scores[i])[:drop_count]
+        for idx in bottom_idx:
+            keep[idx] = False
+        return keep
+
+
+class DropPercentPolicy(FilterPolicy):
+    def __init__(self, drop_percent: float, min_keep: int = 1):
+        super().__init__(min_keep)
+        self.drop_percent = clamp(drop_percent, 0.0, 1.0)
+
+    def select(self, scores: Sequence[float]) -> List[bool]:
+        n = len(scores)
+        if n == 0:
+            return []
+        keep = [True] * n
+        target_keep = n - int(round(n * self.drop_percent))
+        target_keep = max(self.min_keep, min(n, target_keep))
+        k_to_drop = n - target_keep
+        if k_to_drop <= 0:
+            return keep
+        bottom_idx = sorted(range(n), key=lambda i: scores[i])[:k_to_drop]
+        for idx in bottom_idx:
+            keep[idx] = False
+        return keep
+
+
 class StatsTracker:
-    def __init__(self):
+    def __init__(self, enable_noise_eval: bool = False):
         self.total_sent = 0
         self.kept_sent = 0
         self.total_bags = 0
         self.relation_before: Counter[str] = Counter()
         self.relation_after: Counter[str] = Counter()
+        self.noise_eval_enabled = enable_noise_eval
+        self.noise_tp = 0
+        self.noise_fp = 0
+        self.noise_fn = 0
+        self.noise_tn = 0
+        self.noise_total = 0
+        self.noise_missing = 0
 
     def update(self, relation: str, bag_size: int, kept: int) -> None:
         self.total_sent += bag_size
@@ -580,6 +630,24 @@ class StatsTracker:
         self.total_bags += 1
         self.relation_before[relation] += bag_size
         self.relation_after[relation] += kept
+
+    def record_noise(self, keep: bool, noise_label: Optional[bool]) -> None:
+        if not self.noise_eval_enabled:
+            return
+        if noise_label is None:
+            self.noise_missing += 1
+            return
+        self.noise_total += 1
+        if noise_label:  # true noise -> should drop
+            if keep:
+                self.noise_fn += 1
+            else:
+                self.noise_tp += 1
+        else:
+            if keep:
+                self.noise_tn += 1
+            else:
+                self.noise_fp += 1
 
     def summary(self) -> Dict[str, Any]:
         avg_before = self.total_sent / self.total_bags if self.total_bags else 0.0
@@ -604,6 +672,7 @@ class StatsTracker:
                     reverse=True,
                 )
             ],
+            "noise_eval": self._noise_summary(),
         }
 
     def format_summary(self, max_relations: int = 8) -> str:
@@ -621,7 +690,49 @@ class StatsTracker:
             after = entry["after"]
             rate = (after / before) if before else 0.0
             lines.append(f"  {entry['relation']}: {after}/{before} kept ({rate:.1%})")
+        noise_info = info.get("noise_eval")
+        if noise_info:
+            lines.append("Noise filtering evaluation (predict drop = noise):")
+            lines.append(
+                "  precision={precision:.3f} recall={recall:.3f} f1={f1:.3f} "
+                "accuracy={accuracy:.3f}".format(**noise_info)
+            )
+            lines.append(
+                f"  counts: TP={noise_info['tp']} FP={noise_info['fp']} "
+                f"FN={noise_info['fn']} TN={noise_info['tn']} total={noise_info['total']}"
+            )
+            if noise_info["missing_labels"]:
+                lines.append(
+                    f"  missing is_noise labels: {noise_info['missing_labels']}"
+                )
         return "\n".join(lines)
+
+    def _noise_summary(self) -> Optional[Dict[str, Any]]:
+        if not self.noise_eval_enabled:
+            return None
+        total = self.noise_total
+        if total == 0 and self.noise_missing == 0:
+            return None
+        precision = self.noise_tp / (self.noise_tp + self.noise_fp) if (self.noise_tp + self.noise_fp) else 0.0
+        recall = self.noise_tp / (self.noise_tp + self.noise_fn) if (self.noise_tp + self.noise_fn) else 0.0
+        f1 = (
+            2 * precision * recall / (precision + recall)
+            if (precision + recall) > 0
+            else 0.0
+        )
+        accuracy = (self.noise_tp + self.noise_tn) / total if total else 0.0
+        return {
+            "tp": self.noise_tp,
+            "fp": self.noise_fp,
+            "fn": self.noise_fn,
+            "tn": self.noise_tn,
+            "total": total,
+            "missing_labels": self.noise_missing,
+            "precision": precision,
+            "recall": recall,
+            "f1": f1,
+            "accuracy": accuracy,
+        }
 
 
 def build_attention_provider(args: argparse.Namespace) -> AttentionProvider:
@@ -638,6 +749,10 @@ def build_policy(args: argparse.Namespace) -> FilterPolicy:
         return TopKPolicy(k=args.topk, min_keep=args.min_keep)
     if args.policy == "relative":
         return RelativeMarginPolicy(margin=args.margin, min_keep=args.min_keep)
+    if args.policy == "drop":
+        return DropBottomPolicy(drop_k=args.drop_bottom, min_keep=args.min_keep)
+    if args.policy == "drop_pct":
+        return DropPercentPolicy(drop_percent=args.drop_percent, min_keep=args.min_keep)
     raise ValueError(f"Unsupported policy: {args.policy}")
 
 
@@ -667,7 +782,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--policy",
         default="topk",
-        choices=["absolute", "topk", "relative"],
+        choices=["absolute", "topk", "relative", "drop", "drop_pct"],
         help="Filtering rule to apply.",
     )
     parser.add_argument(
@@ -689,6 +804,18 @@ def parse_args() -> argparse.Namespace:
         help="Relative margin parameter for 'relative' policy.",
     )
     parser.add_argument(
+        "--drop-bottom",
+        type=int,
+        default=1,
+        help="Number of lowest-scoring sentences to drop for 'drop' policy.",
+    )
+    parser.add_argument(
+        "--drop-percent",
+        type=float,
+        default=0.1,
+        help="Fraction (0-1) of lowest sentences to drop for 'drop_pct' policy.",
+    )
+    parser.add_argument(
         "--min-keep",
         type=int,
         default=1,
@@ -708,6 +835,11 @@ def parse_args() -> argparse.Namespace:
         "--annotate-attention",
         action="store_true",
         help="If set, append an 'attention_score' field to every kept record.",
+    )
+    parser.add_argument(
+        "--evaluate-noise",
+        action="store_true",
+        help="If set and the dataset provides 'is_noise', compute filtering precision/recall.",
     )
     parser.add_argument(
         "--report",
@@ -744,7 +876,7 @@ def main() -> None:
     bags, bag_order = load_dataset(input_path, limit_bags=args.limit_bags)
     attention_provider = build_attention_provider(args)
     policy = build_policy(args)
-    stats = StatsTracker()
+    stats = StatsTracker(enable_noise_eval=args.evaluate_noise)
     LOGGER.info(
         "Filtering %d bags using policy=%s (min_keep=%d)",
         len(bag_order),
@@ -768,6 +900,20 @@ def main() -> None:
             mask = policy.select(scores)
             bag_kept = 0
             for sent, keep, att in zip(bag, mask, scores):
+                noise_label = sent.data.get("is_noise")
+                if isinstance(noise_label, str):
+                    lowered = noise_label.lower()
+                    if lowered in {"true", "1"}:
+                        noise_label_bool = True
+                    elif lowered in {"false", "0"}:
+                        noise_label_bool = False
+                    else:
+                        noise_label_bool = None
+                elif isinstance(noise_label, bool):
+                    noise_label_bool = noise_label
+                else:
+                    noise_label_bool = None
+                stats.record_noise(keep=keep, noise_label=noise_label_bool)
                 if keep:
                     record = dict(sent.data)
                     if args.annotate_attention:
@@ -788,4 +934,15 @@ def main() -> None:
 if __name__ == "__main__":
     main()
 
+
+# 使用例：
 # python3 filter/main.py --split train --limit-bags 5 --policy topk --topk 1 --output tmp/nyt10m_train_filtered_sample.txt
+# python3 filter/main.py --split train --limit-bags 2 --policy drop --drop-bottom 1 --output tmp/nyt10m_train_filtered_sample.txt
+# --policy topk --topk N
+# --policy absolute --threshold T
+# --policy relative --margin M
+# --min-keep
+# --policy drop --drop-bottom K
+# python3 filter/main.py --input data/arnor_test.txt --policy drop --drop-bottom 10 --limit-bags 10 --evaluate-noise --output tmp/arnor_filtered.txt
+# python3 filter/main.py --input data/arnor_test.txt --policy drop_pct --drop-percent 0.5 --limit-bags 10 --evaluate-noise --output tmp/arnor_filtered.txt
+# python3 filter/main.py --input data/arnor_test.txt --policy drop_pct --drop-percent 0.2 --evaluate-noise --output tmp/arnor_filtered_full.txt
