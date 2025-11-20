@@ -1,3 +1,5 @@
+/tmp，/out 两个文件夹是用来存临时文件的，里面的文件不会同步到git
+
 数据集：
 https://www.kaggle.com/datasets/daishinkan002/new-york-times-relation-extraction-dataset?resource=download&utm_source=chatgpt.com
 放在\data\NYTRED里面
