@@ -111,3 +111,13 @@ Citation
 cd data
 bash download_nyt10.sh
 bash download_nyt10m.sh
+
+数据集说明：（https://opennre-docs.readthedocs.io/en/latest/get_started/benchmark.html#bag-level-relation-extraction）
+| 项目                        | NYT10                                                                      | NYT10m                                                                                |
+| -------------------------- | ---------------------------------------------------------------------------| ------------------------------------------------------------------------------------- |
+| 关系类别数 (#class)          | 53 个关系类别。([opennre-docs.readthedocs.io][1])                            | 25 个关系类别。([akbc.ws][2])                                                           |
+| 实例（bags 或句子／实体对）规模 | 694,491 个实例。([opennre-docs.readthedocs.io][1])                          | 474,059 个训练实例（或总实例）约数。([cse.iitd.ac.in][3])                                  |
+| 测试集标注质量                | 多为远监督自动标注（noisy labels）——原始 NYT10 测试集没有人工清洗。([akbc.ws][2]) | 测试集为 **人工标注**（manually annotated test set），目的是提升评测可信度。([akbc.ws][2])     |
+| 训练／验证集设置              | 原始训练集为远监督构造；没有专门人工清洗验证集。([cse.iitd.ac.in][3])              | 鼓励有验证集，并且关系类别在训练与测试之间保持一致性。([akbc.ws][2])                           |
+| 任务目标（适用性）            | 更“经典”、大规模，但噪声更多，测试集可能更偏向 “held-out” 远监督情境。              | 更严格用于评测：测试集人工标注，更适合作为“高质量”benchmark。                                  |
+| 推荐使用场景                 | 若你想使用大规模数据训练，探索模型在大量远监督实例上的表现。                         | 若你想做模型评估、benchmark 比较、追求更可靠的评价结果。                                     |
