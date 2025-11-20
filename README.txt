@@ -103,3 +103,11 @@ Citation
     doi = "10.18653/v1/D19-3029",
     pages = "169--174"
 }
+
+
+
+================================
+数据准备：
+cd data
+bash download_nyt10.sh
+bash download_nyt10m.sh

@@ -56,3 +56,5 @@ Desktop.ini
 !/data/.gitkeep
 /data/NYTRED/*
 !/data/NYTRED/.gitkeep
+/data/nyt10
+/data/nyt10m
