@@ -10,21 +10,20 @@ Behavior:
 - Build `rel2id` automatically with `"NA": 0` and other relations starting from 1.
 
 Output (by default):
-- OpenNRE/benchmark/converted_arnor/arnor_test.txt  (one JSON dict per line)
-- OpenNRE/benchmark/converted_arnor/arnor_rel2id.json
+- OpenNRE/benchmark/arnor_test.txt  (one JSON dict per line)
+- OpenNRE/benchmark/arnor_rel2id.json
 
 Usage:
     python3 OpenNRE/scripts/convert_arnor_to_opennre.py
 or with explicit paths:
     python3 OpenNRE/scripts/convert_arnor_to_opennre.py \
         --input data/arnor_dataset-2.0.0/test.json \
-        --out OpenNRE/benchmark/converted_arnor/arnor_test.txt \
-        --rel2id OpenNRE/benchmark/converted_arnor/arnor_rel2id.json
+        --out OpenNRE/benchmark/arnor_test.txt \
+        --rel2id OpenNRE/benchmark/arnor_rel2id.json
 """
 import json
 import argparse
 import re
-from pathlib import Path
 from collections import OrderedDict, defaultdict
 
 
@@ -77,11 +76,6 @@ def normalize_label(lab):
     if s == "" or s.lower() in ("none", "null"):
         return "NA"
     return s
-
-
-def ensure_dir(path: Path):
-    if not path.parent.exists():
-        path.parent.mkdir(parents=True, exist_ok=True)
 
 
 def convert_file(input_path, out_path, rel2id_path):
@@ -159,19 +153,16 @@ def convert_file(input_path, out_path, rel2id_path):
         cur += 1
 
     # write output
-    ensure_dir(Path(out_path))
     with open(out_path, 'w', encoding='utf-8') as wf:
         for it in out_lines:
             wf.write(json.dumps(it, ensure_ascii=False) + '\n')
 
-    ensure_dir(Path(rel2id_path))
     with open(rel2id_path, 'w', encoding='utf-8') as rf:
         json.dump(rel2id, rf, indent=2, ensure_ascii=False)
 
     # write noise statistics summary
     noise_stats_path = rel2id_path.replace('_rel2id.json', '_noise_stats.json')
     try:
-        ensure_dir(Path(noise_stats_path))
         with open(noise_stats_path, 'w', encoding='utf-8') as nsf:
             json.dump(noise_counts, nsf, indent=2, ensure_ascii=False)
         print(f"Wrote noise stats to {noise_stats_path}")
@@ -191,8 +182,8 @@ def convert_file(input_path, out_path, rel2id_path):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--input', default='data/arnor_dataset-2.0.0/test.json')
-    parser.add_argument('--out', default='OpenNRE/benchmark/converted_arnor/arnor_test.txt')
-    parser.add_argument('--rel2id', default='OpenNRE/benchmark/converted_arnor/arnor_rel2id.json')
+    parser.add_argument('--out', default='OpenNRE/benchmark/arnor_test.txt')
+    parser.add_argument('--rel2id', default='OpenNRE/benchmark/arnor_rel2id.json')
     args = parser.parse_args()
 
     convert_file(args.input, args.out, args.rel2id)

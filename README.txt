@@ -37,16 +37,17 @@ https://github.com/PaddlePaddle/Research/blob/master/NLP/ACL2019-ARNOR/README.md
     ...
 }
 
-1. Basic Preparation
+
+How to run OpenNRE:
 --Environment Preparation
 pip install -r requirements.txt
 python setup.py install
 
---Downloading the dataset for baseline model
+--Downloading the dataset
 cd ./benchmark
 bash download_nyt10m.sh
 
---Training the baseline model
+Training:
 python3 example/train_bag_cnn.py \
     --metric auc \
     --dataset nyt10m \
@@ -59,31 +60,37 @@ python3 example/train_bag_cnn.py \
     --encoder pcnn \
     --aggr att
 
-2. ARNOR → OpenNRE conversion
-Script: OpenNRE/scripts/convert_arnor_to_opennre.py
-What it does: converts Arnor JSON (one JSON object per line) into OpenNRE line-by-line format by emitting one OpenNRE-style record per `relationMention`. The script preserves the original `is_noise` flag by adding `"is_noise": true|false` to each output record.
-How entity spans are generated: the script tries several heuristics to locate entity surface text in the sentence (direct find, case-insensitive, whitespace-normalized, token-sequence match). If a span cannot be found a fallback `(0,0)` span is written and a warning is printed during conversion; you should inspect such warnings and adjust if precise spans are required.
-Default input: data/arnor_dataset-2.0.0/test.json
-Default outputs:
-    OpenNRE/benchmark/converted_arnor/arnor_test.txt  (one JSON dict per line; fields: `text`, `h`/`t` with `pos` char spans, `relation`, `is_noise`)
-    OpenNRE/benchmark/converted_arnor/arnor_rel2id.json (automatic rel2id; `NA` -> 0)
 
---Run the converter:
-python3 scripts/convert_arnor_to_opennre.py
-(This will write three arnor dataset files into OpenNRE/benchmark/converted_arnor in the same format with NYT10m
-To inspect the first few converted examples:
-head -n 5 OpenNRE/benchmark/converted_arnor/arnor_test.txt
-cat OpenNRE/benchmark/converted_arnor/arnor_rel2id.json | jq .
-)
+**ARNOR → OpenNRE conversion**
+- **Script:** `OpenNRE/scripts/convert_arnor_to_opennre.py`
+- **What it does:** converts Arnor JSON (one JSON object per line) into OpenNRE line-by-line format by emitting one OpenNRE-style record per `relationMention`. The script preserves the original `is_noise` flag by adding `"is_noise": true|false` to each output record.
+- **Default input:** `data/arnor_dataset-2.0.0/test.json`
+- **Default outputs:**
+    - `OpenNRE/benchmark/arnor_test.txt`  (one JSON dict per line; fields: `text`, `h`/`t` with `pos` char spans, `relation`, `is_noise`)
+    - `OpenNRE/benchmark/arnor_rel2id.json` (automatic rel2id; `NA` -> 0)
+- **How entity spans are generated:** the script tries several heuristics to locate entity surface text in the sentence (direct find, case-insensitive, whitespace-normalized, token-sequence match). If a span cannot be found a fallback `(0,0)` span is written and a warning is printed during conversion; you should inspect such warnings and adjust if precise spans are required.
+
+Run the converter (from project root):
+```bash
+python3 OpenNRE/scripts/convert_arnor_to_opennre.py
+```
+
+Inspect the first few converted examples:
+```bash
+head -n 5 OpenNRE/benchmark/arnor_test.txt
+cat OpenNRE/benchmark/arnor_rel2id.json | jq .
+```
 
 Mapping to OpenNRE benchmark `rel2id`:
 - A mapping file was created to compare Arnor relations to the `nyt10m` relation vocabulary:
     - `OpenNRE/benchmark/arnor_to_nyt10m_mapping.json`
 - The mapping uses exact-match first, then simple heuristics (small underscore/word differences). Review the mapping file and adjust if you prefer alternative mappings.
 
+Quick sanity note:
+- The OpenNRE encoders expect `h.pos` and `t.pos` to be character spans inside `text`. If you plan to train with BERT encoders, verify a small subset loads correctly with your chosen encoder/tokenizer.
 
---Run the filter
-python3 filter/main.py --split train --limit-bags 5 --policy topk --topk 1 --output tmp/nyt10m_train_filtered_sample.txt
+Contact / Next steps:
+- If you want, I can (a) run a short data-loader sanity check that imports the file into OpenNRE's `SentenceREDataset`, or (b) produce a CSV-style mapping with confidence scores for manual review. Tell me which to do next.
 
 
 Citation
@@ -98,7 +105,12 @@ Citation
 }
 
 
+
 ================================
+数据准备：
+cd data
+bash download_nyt10.sh
+bash download_nyt10m.sh
 
 数据集说明：
 （https://github.com/thunlp/OpenNRE.git）
@@ -113,6 +125,7 @@ Citation
 | 推荐使用场景                 | 若你想使用大规模数据训练，探索模型在大量远监督实例上的表现。                         | 若你想做模型评估、benchmark 比较、追求更可靠的评价结果。                                     |
 
 
+python3 filter/main.py --split train --limit-bags 5 --policy topk --topk 1 --output tmp/nyt10m_train_filtered_sample.txt
 
 in main:
 Implemented a standalone NYT10m filter CLI (filter/main.py) that mirrors the proposal’s attention-filter stage. It reads a split (nyt10m_train/val/test.txt), groups sentences into bags by (relation, head_id, tail_id), and assigns each sentence a heuristic attention score using relation-specific lexical cues, entity distance, and context-based features to mimic attention weights.

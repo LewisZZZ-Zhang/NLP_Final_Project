@@ -762,7 +762,7 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--dataset-root",
-        default="OpenNRE/benchmark/nyt10m",
+        default="data/nyt10m",
         help="Directory that contains nyt10m_<split>.txt files.",
     )
     parser.add_argument(
