@@ -1,2 +1,3 @@
+# Keep the `data/arnor_dataset-2.0.0` directory in the repo while ignoring its files
 # Keep this file so Git will track the `out/` directory.
 # Add other files to `out/` as needed — they will be ignored by .gitignore.
