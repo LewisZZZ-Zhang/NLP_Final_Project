@@ -947,6 +947,8 @@ if __name__ == "__main__":
 # python3 filter/main.py --input data/arnor_test.txt --policy drop_pct --drop-percent 0.5 --limit-bags 10 --evaluate-noise --output tmp/arnor_filtered.txt
 # python3 filter/main.py --input data/arnor_test_filtered.txt --policy drop_pct --drop-percent 0.2 --evaluate-noise --output tmp/arnor_filtered_full.txt
 
+# python3 filter/main.py --input data/arnor_test_without_NA.txt --policy drop_pct --policy absolute --threshold 0.05 --evaluate-noise --output tmp/arnor_filtered_full.txt
+
 # TP（True Positive）：确实是噪声并被过滤掉的句子，说明过滤器成功删掉 40 条标注为噪声的样本。
 # FP（False Positive）：原本是干净句子却被误删的 164 条，越少越好。
 # FN（False Negative）：原本是噪声但被保留下来的 219 条，意味着还有很多噪声没被过滤。
