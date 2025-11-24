@@ -71,3 +71,7 @@ data/arnor_benchmark/arnor_test_noise.txt
 data/arnor_benchmark/arnor_test_noise_full.txt
 data/arnor_benchmark/arnor_train.txt
 data/arnor_benchmark/arnor_train_full.txt
+
+# Ignore all benchmark txt files and entire arnor dataset directory
+data/arnor_benchmark/*.txt
+data/arnor_dataset-2.0.0/*
