@@ -14,7 +14,14 @@ https://www.kaggle.com/datasets/daishinkan002/new-york-times-relation-extraction
 https://github.com/PaddlePaddle/Research/blob/master/NLP/ACL2019-ARNOR/README.md
 该数据集为论文模型ARNOR所使用的训练集的优化版本， 特点是在test数据集中直接存在手动标记的is_nosie标签
 可以用于直接测试attention block过滤噪声的能力。
-以下附有数据结构：
+放在\data\arnor_dataset-2.0.0里面
+├── data
+│   └── NYTRED
+│       ├── dev.json          用于参数调试
+│       ├── test_nosie.json   用于filter表现评估
+│       ├── test.json         用于RC模型表现评估
+│       └── train.json        用于RC/filter模型训练
+以下附有数据结构：    
 {
     "sentText": "The source sentence text",
     "relationMentions": [
@@ -205,3 +212,4 @@ main的更多使用例在main.py的最底下
 arnor_dev/train/test.txt: 仅包含arnor与nyt10m所共有的17中relation
 arnor_dev/train/test_full.txt: 包含arnor数据集中的全部26中relation
 具体relation种类请参考data/arnor_benchmark/common_relations.json
+
