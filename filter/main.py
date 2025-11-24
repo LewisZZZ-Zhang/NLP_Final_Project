@@ -866,7 +866,31 @@ def main() -> None:
         format="%(levelname)s %(message)s",
     )
     dataset_root = Path(args.dataset_root)
-    input_path = Path(args.input) if args.input else dataset_root / f"nyt10m_{args.split}.txt"
+
+    # If user provided --input, that overrides everything
+    if args.input:
+        input_path = Path(args.input)
+    else:
+        # Prefer a converted Arnor `test_noise` file if present (OpenNRE/benchmark),
+        # then fallback to older `data` location, then to the default nyt10m split.
+        candidates = [
+            # Prefer the converted Arnor test_noise saved under data/arnor_benchmark
+            Path("data") / "arnor_benchmark" / "arnor_test_noise.txt",
+            '''# fall back to any benchmark copy or older data location
+            Path("OpenNRE") / "benchmark" / "arnor_test_noise.txt",
+            Path("data") / "arnor_test_noise.txt",
+            to be deleted after testing'''
+        ]
+        found = None
+        for cand in candidates:
+            if cand.exists():
+                found = cand
+                break
+        if found:
+            input_path = found
+        else:
+            input_path = dataset_root / f"nyt10m_{args.split}.txt"
+
     if not input_path.exists():
         raise FileNotFoundError(f"Input file {input_path} does not exist.")
     output_path = Path(args.output) if args.output else input_path.with_name(
