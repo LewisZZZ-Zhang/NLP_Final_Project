@@ -204,3 +204,14 @@ Created 1 todo
 - 将上面的要点整理成 README 段落并写入 `filter/README.md`？
 - 帮你把某个策略做可视化或对比（运行并输出统计）？
 - 或者把启发式权重参数化、提取到配置文件以便调参？
+
+
+
+
+11/23 update
+文件结构更新后 需先运行scripts/convert_arnor_to_opennre.py 随后代码就能正常运行
+现在arnor dataset所有非原生文件均放在data/arnor_benchmark文件夹内 
+并且转化后的文件有2个版本:
+arnor_dev/train/test.txt: 仅包含arnor与nyt10m所共有的17中relation
+arnor_dev/train/test_full.txt: 包含arnor数据集中的全部26中relation
+具体relation种类请参考data/arnor_benchmark/common_relations.json
