@@ -210,7 +210,7 @@ main的更多使用例在main.py的最底下
 
 
 11/23 update
-文件结构更新后 需先运行scripts/convert_arnor_to_opennre.py 随后代码就能正常运行
+文件结构更新后 需先运行scripts/convert_arnor_to_nyt10m.py 随后代码就能正常运行
 现在arnor dataset所有非原生文件均放在data/arnor_benchmark文件夹内 
 并且转化后的文件有2个版本:
 arnor_dev/train/test.txt: 仅包含arnor与nyt10m所共有的17中relation
