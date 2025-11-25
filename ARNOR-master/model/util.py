@@ -225,7 +225,8 @@ def parser_score(epoch, best_score, cur_score, accs, logger, mode='val'):
     for k, v in cur_score.items():
         logger.info('{:<50}:\tP: {:>10.2f}\tR: {:>10.2f}\tF1: {:>10.2f}'.format(k, v['P'] * 100, v['R'] * 100, v['F1'] * 100))
     if mode.lower() != 'test':
-        logger.info('best_F1:{:^.2f} in epoch:{}'.format(best_score[0] * 100, best_score[1]))
+        # Use a simple float format for clarity (percentage with two decimals)
+        logger.info('best_F1:{:.2f} in epoch:{}'.format(best_score[0] * 100, best_score[1]))
 
     return best_score, flag
 
