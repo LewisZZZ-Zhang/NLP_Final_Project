@@ -14,8 +14,11 @@ from collections import OrderedDict
 
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = '3'
 
+# Ensure TF1-style graph/session code runs under TF2 by using the v1 compatibility
+if tf.__version__.startswith('2'):
+    tf.compat.v1.disable_eager_execution()
 
-flags = tf.app.flags
+flags = tf.compat.v1.app.flags
 flags.DEFINE_boolean("clean",                           False,          "Clean train file")
 flags.DEFINE_boolean("train",                           False,          "Whether train the model")
 flags.DEFINE_boolean("restore",                         False,          "Wither restore ckpt")
@@ -46,7 +49,11 @@ flags.DEFINE_boolean("lower",                           False,          "Wither 
 flags.DEFINE_boolean("redistribution",                  True,           "Wither redistribution")
 flags.DEFINE_boolean("attention_regularization",        True,           "Wither attention regularization")
 flags.DEFINE_boolean("bootstrap",                       True,           "Wither bootstrap")
-FLAGS = tf.app.flags.FLAGS
+FLAGS = flags.FLAGS
+
+# Base data directory (dataset lives next to the ARNOR-master folder)
+SCRIPT_DIR = os.path.dirname(os.path.realpath(__file__))
+DATA_DIR = os.path.abspath(os.path.join(SCRIPT_DIR, '..', 'data', 'arnor_dataset-2.0.0'))
 
 
 
@@ -95,7 +102,7 @@ def get_config():
 
 def train(config, logger):
     logger.info('------load train data------')
-    train_datas = load_data_file('datas/train.json', zero=config['zero'], lower=config['lower'])
+    train_datas = load_data_file(os.path.join(DATA_DIR, 'train.json'), zero=config['zero'], lower=config['lower'])
     config = build_maps(train_datas, config, logger)
 
     train_data_loader = data_loader(train_datas, config)
@@ -114,7 +121,7 @@ def train(config, logger):
     logger.info('--------------------------\n')
 
     logger.info('------load val data------')
-    val_datas = load_data_file('datas/dev.json', zero=config['zero'], lower=config['lower'])
+    val_datas = load_data_file(os.path.join(DATA_DIR, 'dev.json'), zero=config['zero'], lower=config['lower'])
     val_data_loader = data_loader(val_datas, config)
     data_count, badcase, ignore, _ = val_data_loader.load(config['use_small'])
     logger.info('---Data count---')
@@ -131,7 +138,7 @@ def train(config, logger):
     logger.info('--------------------------\n')
 
     logger.info('------load test data------')
-    test_datas = load_data_file('datas/test.json', zero=config['zero'], lower=config['lower'])
+    test_datas = load_data_file(os.path.join(DATA_DIR, 'test.json'), zero=config['zero'], lower=config['lower'])
     test_data_loader = data_loader(test_datas, config)
     data_count, badcase, ignore, _ = test_data_loader.load(config['use_small'])
     logger.info('---Data count---')
@@ -147,7 +154,8 @@ def train(config, logger):
         logger.info('{:<50}\t{:>}'.format(label, num))
     logger.info('--------------------------\n')
 
-    config['position_num'] = pos_max
+    # pos_max is an inclusive max position index; add 1 to create embedding table size
+    config['position_num'] = pos_max + 1
     print(config['position_num'], 'position_num')
     trustable_pattern = None
     if config['bootstrap'] or config['redistribution']:
@@ -170,13 +178,28 @@ def train(config, logger):
             v = heapq.nlargest(sel_num, v.items(), key=lambda x: x[1])
             trustable_pattern[k] = set([v1 for v1, v2 in v])
 
+    # Clear Keras global state and reset UID counters so layer names are
+    # deterministic between the training and validation graphs. This avoids
+    # Keras appending suffixes like `_1` which would break checkpoint name
+    # matching across graphs.
+    try:
+        tf.keras.backend.clear_session()
+    except Exception:
+        pass
+    try:
+        tf.keras.utils.reset_uids()
+    except Exception:
+        pass
+
     with tf.Graph().as_default() as g:
         train_model = model(config, 'train', trustable_pattern)
         train_model.build(g)
 
-    with tf.Graph().as_default() as g:
-        val_model = model(config, 'val')
-        val_model.build(g)
+    # Use the training model instance for validation so we evaluate with the
+    # exact same graph/session/weights produced by training. This avoids
+    # checkpoint-name mismatches that can occur when building a separate
+    # validation graph with Keras-created layers.
+    val_model = train_model
 
 
     # for not boostrap or firt loop of bootstrap
@@ -282,9 +305,9 @@ def test(config, logger):
     config['word_num'] = len(vocab)
     config['type_num'] = len(type_dict)
     config['label_num'] = len(label_dict)
-    config['position_num'] = config['pos_max']
+    config['position_num'] = config['pos_max'] + 1
 
-    test_datas = load_data_file('datas/test.json', zero=config['zero'], lower=config['lower'])
+    test_datas = load_data_file(os.path.join(DATA_DIR, 'test.json'), zero=config['zero'], lower=config['lower'])
     test_data_loader = data_loader(test_datas, config)
     badcase = test_data_loader.load()
     logger.info('test datas: {}'.format(len(test_data_loader)))
@@ -327,5 +350,5 @@ def main(_):
 
 
 if __name__ == '__main__':
-    tf.app.run(main)
+    tf.compat.v1.app.run(main)
 

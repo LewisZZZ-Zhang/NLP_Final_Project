@@ -246,8 +246,10 @@ def build_maps(train_datas, config, logger):
     config['word_num'] = len(vocab)
     config['type_num'] = len(type_dict)
     config['label_num'] = len(label_dict)
-    config['position_num'] = config['pos_max'] if config['pos_max'] > 0 \
-        else max([len(d['sentText'].split(' ')) for d in train_datas])
+    # position indices can range from 0..pos_max inclusive, so add 1 to reserve index
+    # for the maximum position. If pos_max is not set, use max sentence length (+1).
+    config['position_num'] = (config['pos_max'] + 1) if config['pos_max'] > 0 \
+        else (max([len(d['sentText'].split(' ')) for d in train_datas]) + 1)
 
     for k, v in config.items():
         logger.info('config {}: {}'.format(k, v))
