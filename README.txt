@@ -217,3 +217,13 @@ arnor_dev/train/test.txt: 仅包含arnor与nyt10m所共有的17中relation
 arnor_dev/train/test_full.txt: 包含arnor数据集中的全部26中relation
 具体relation种类请参考data/arnor_benchmark/common_relations.json
 
+
+11/24 update
+arnor的训练代码：
+python3 ARNOR-master/main.py --train=True --clean=True --use_small=False --epoch=50 --first_loop_epoch=1
+--train=True: 是否真的进行训练（还是说只是测试一下）
+--clear=True: 是否删除之前的ckpt，重新开始训练
+--use_small: 是否只抽取一部分样本进行训练
+--first_loop_epoch=1: 当 bootstrap（config 中的一个开关，默认 True）开启时，脚本先运行 first_loop_epoch 个 epoch 作为“第一轮”，随后运行 epoch - first_loop_epoch 个 epoch 做后续循环。若 bootstrap=False，脚本直接用 epoch 做完整训练轮数。
+其它相关 flags（命令里没给但脚本支持）：--restore（是否从检查点恢复）、--dropout、--batchsize、--lr 等，均在 main.py 的 flags 定义中可查。
+
