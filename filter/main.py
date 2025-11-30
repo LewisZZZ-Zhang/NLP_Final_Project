@@ -1004,10 +1004,10 @@ def main() -> None:
         unk = entry["report"].get("unknown_relations", [])
         print(f"\nFile: {inp}")
         if not unk:
-            print("  (所有关系都有定义规则)")
+            print("  (All relations have defined rules)")
             continue
         for item in unk:
-            print(f"  {item['relation']}: {item['count']} 次")
+            print(f"  {item['relation']}: {item['count']} times")
 
 
 if __name__ == "__main__":
