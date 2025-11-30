@@ -103,6 +103,11 @@ Quick sanity note:
 Contact / Next steps:
 - If you want, I can (a) run a short data-loader sanity check that imports the file into OpenNRE's `SentenceREDataset`, or (b) produce a CSV-style mapping with confidence scores for manual review. Tell me which to do next.
 
+Training data analysis:
+python3 Scripts/data_analysis/analyze_train.py
+( The datasets analyzed is the training data from arnor_dataset-2.0.0
+  Results will be stored in reports/
+)
 
 Citation
 @inproceedings{han-etal-2019-opennre,

@@ -68,3 +68,5 @@ OpenNRE/benchmark/arnor_noise_stats.json
 /data/arnor_benchmark/*.txt
 !/data/arnor_benchmark/.gitkeep
 OpenNRE/benchmark/nyt10m/nyt10m_rel2id.json.1
+
+*json
