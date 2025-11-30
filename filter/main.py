@@ -776,6 +776,15 @@ def parse_args() -> argparse.Namespace:
         help="Custom input file. Overrides --dataset-root/--split.",
     )
     parser.add_argument(
+        "--input-multiple",
+        help="Comma-separated list of input files to process sequentially.",
+    )
+    parser.add_argument(
+        "--process-arnor-three",
+        action="store_true",
+        help="Convenience flag: process the three Arnor files from data/arnor_benchmark.",
+    )
+    parser.add_argument(
         "--output",
         help="Output path. Defaults to <input_stem>_<policy>_filtered.txt.",
     )
@@ -867,92 +876,138 @@ def main() -> None:
     )
     dataset_root = Path(args.dataset_root)
 
-    # If user provided --input, that overrides everything
-    if args.input:
-        input_path = Path(args.input)
-    else:
-        # Prefer a converted Arnor `test_noise` file if present (OpenNRE/benchmark),
-        # then fallback to older `data` location, then to the default nyt10m split.
-        candidates = [
-            # Prefer the converted Arnor test_noise saved under data/arnor_benchmark
-            Path("data") / "arnor_benchmark" / "arnor_test_noise.txt",
-            '''# fall back to any benchmark copy or older data location
-            Path("OpenNRE") / "benchmark" / "arnor_test_noise.txt",
-            Path("data") / "arnor_test_noise.txt",
-            to be deleted after testing'''
+    # Determine list of input files to process. Support single input, multiple inputs,
+    # or a convenience flag to process the three Arnor files included in the repo.
+    input_paths: List[Path] = []
+    if args.process_arnor_three:
+        input_paths = [
+            Path("data") / "arnor_benchmark" / "arnor_dev_full.txt",
+            Path("data") / "arnor_benchmark" / "arnor_test_full.txt",
+            Path("data") / "arnor_benchmark" / "arnor_test_noise_full.txt",
         ]
-        found = None
-        for cand in candidates:
-            if cand.exists():
-                found = cand
-                break
-        if found:
-            input_path = found
-        else:
-            input_path = dataset_root / f"nyt10m_{args.split}.txt"
+    elif args.input_multiple:
+        input_paths = [Path(p.strip()) for p in args.input_multiple.split(",") if p.strip()]
+    elif args.input:
+        input_paths = [Path(args.input)]
+    else:
+        # Fallback to single default split file
+        input_paths = [dataset_root / f"nyt10m_{args.split}.txt"]
 
-    if not input_path.exists():
-        raise FileNotFoundError(f"Input file {input_path} does not exist.")
-    output_path = Path(args.output) if args.output else input_path.with_name(
-        f"{input_path.stem}_{args.policy}_filtered.txt"
-    )
-    ensure_dir(output_path)
-    bags, bag_order = load_dataset(input_path, limit_bags=args.limit_bags)
+    # Validate files exist
+    for p in input_paths:
+        if not p.exists():
+            raise FileNotFoundError(f"Input file {p} does not exist.")
+
+    # Build shared components
     attention_provider = build_attention_provider(args)
     policy = build_policy(args)
-    stats = StatsTracker(enable_noise_eval=args.evaluate_noise)
-    LOGGER.info(
-        "Filtering %d bags using policy=%s (min_keep=%d)",
-        len(bag_order),
-        args.policy,
-        args.min_keep,
-    )
-    with output_path.open("w") as writer:
-        for bag_id in bag_order:
-            bag = bags.get(bag_id, [])
-            if not bag:
-                continue
-            scores = attention_provider.get_scores(bag_id, bag)
-            if len(scores) != len(bag):
-                LOGGER.warning(
-                    "Bag %s has %d sentences but %d attention scores; falling back to uniform.",
-                    bag_id,
-                    len(bag),
-                    len(scores),
-                )
-                scores = [1.0 / len(bag)] * len(bag)
-            mask = policy.select(scores)
-            bag_kept = 0
-            for sent, keep, att in zip(bag, mask, scores):
-                noise_label = sent.data.get("is_noise")
-                if isinstance(noise_label, str):
-                    lowered = noise_label.lower()
-                    if lowered in {"true", "1"}:
-                        noise_label_bool = True
-                    elif lowered in {"false", "0"}:
-                        noise_label_bool = False
+
+    # We'll collect a per-file report including unknown relations counts.
+    all_reports: List[Dict[str, Any]] = []
+
+    for input_path in input_paths:
+        output_path = Path(args.output) if args.output else input_path.with_name(
+            f"{input_path.stem}_{args.policy}_filtered.txt"
+        )
+        ensure_dir(output_path)
+
+        bags, bag_order = load_dataset(input_path, limit_bags=args.limit_bags)
+        stats = StatsTracker(enable_noise_eval=args.evaluate_noise)
+        # Track unknown relations by sentence count
+        unknown_relations: Counter = Counter()
+
+        LOGGER.info(
+            "Filtering %d bags from %s using policy=%s (min_keep=%d)",
+            len(bag_order),
+            input_path,
+            args.policy,
+            args.min_keep,
+        )
+        with output_path.open("w") as writer:
+            for bag_id in bag_order:
+                bag = bags.get(bag_id, [])
+                if not bag:
+                    continue
+                # Count relation occurrences for unknown-relations tracking
+                relation = bag[0].relation if bag else "NA"
+                if relation not in RELATION_HINTS:
+                    # count sentences in bag toward unknown relation frequency
+                    unknown_relations[relation] += len(bag)
+
+                scores = attention_provider.get_scores(bag_id, bag)
+                if len(scores) != len(bag):
+                    LOGGER.warning(
+                        "Bag %s has %d sentences but %d attention scores; falling back to uniform.",
+                        bag_id,
+                        len(bag),
+                        len(scores),
+                    )
+                    scores = [1.0 / len(bag)] * len(bag)
+                mask = policy.select(scores)
+                bag_kept = 0
+                for sent, keep, att in zip(bag, mask, scores):
+                    noise_label = sent.data.get("is_noise")
+                    if isinstance(noise_label, str):
+                        lowered = noise_label.lower()
+                        if lowered in {"true", "1"}:
+                            noise_label_bool = True
+                        elif lowered in {"false", "0"}:
+                            noise_label_bool = False
+                        else:
+                            noise_label_bool = None
+                    elif isinstance(noise_label, bool):
+                        noise_label_bool = noise_label
                     else:
                         noise_label_bool = None
-                elif isinstance(noise_label, bool):
-                    noise_label_bool = noise_label
+                    stats.record_noise(keep=keep, noise_label=noise_label_bool)
+                    if keep:
+                        record = dict(sent.data)
+                        if args.annotate_attention:
+                            record["attention_score"] = round(att, 6)
+                        writer.write(json.dumps(record))
+                        writer.write("\n")
+                        bag_kept += 1
+                stats.update(bag[0].relation, len(bag), bag_kept)
+
+        LOGGER.info("Wrote filtered split to %s", output_path)
+        summary_text = stats.format_summary()
+        print(f"\n=== Filter summary for {input_path} ===\n" + summary_text)
+
+        report: Dict[str, Any] = stats.summary()
+        # Add unknown relations detail to report
+        report["unknown_relations"] = [
+            {"relation": rel, "count": cnt} for rel, cnt in unknown_relations.most_common()
+        ]
+        all_reports.append({"input": str(input_path), "report": report})
+
+        # Optionally write per-file JSON report next to output or to --report if provided
+        if args.report:
+            report_path = Path(args.report)
+            # if report path is directory, write per-file JSON inside it
+            if report_path.exists() and report_path.is_dir():
+                outf = report_path / f"filter_summary_{input_path.stem}.json"
+            else:
+                # if single file target, when multiple inputs we append the stem
+                if len(input_paths) > 1:
+                    ensure_dir(report_path)
+                    outf = report_path.with_name(report_path.stem + f"_{input_path.stem}").with_suffix(report_path.suffix or ".json")
                 else:
-                    noise_label_bool = None
-                stats.record_noise(keep=keep, noise_label=noise_label_bool)
-                if keep:
-                    record = dict(sent.data)
-                    if args.annotate_attention:
-                        record["attention_score"] = round(att, 6)
-                    writer.write(json.dumps(record))
-                    writer.write("\n")
-                    bag_kept += 1
-            stats.update(bag[0].relation, len(bag), bag_kept)
-    LOGGER.info("Wrote filtered split to %s", output_path)
-    summary_text = stats.format_summary()
-    print("\n=== Filter summary ===\n" + summary_text)
-    if args.report:
-        ensure_dir(Path(args.report))
-        with Path(args.report).open("w") as f:
-            json.dump(stats.summary(), f, indent=2)
+                    outf = report_path
+            ensure_dir(outf)
+            with outf.open("w") as f:
+                json.dump(report, f, indent=2)
+
+    # After processing all files, print a concise per-file unknown-relations summary
+    print("\n=== Unknown-relations summary (per file) ===")
+    for entry in all_reports:
+        inp = entry["input"]
+        unk = entry["report"].get("unknown_relations", [])
+        print(f"\nFile: {inp}")
+        if not unk:
+            print("  (所有关系都有定义规则)")
+            continue
+        for item in unk:
+            print(f"  {item['relation']}: {item['count']} 次")
 
 
 if __name__ == "__main__":
