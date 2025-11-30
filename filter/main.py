@@ -323,14 +323,68 @@ def load_dataset(
                 skipped += 1
                 continue
             relation = record.get("relation", "NA")
-            head = record.get("h", {})
-            tail = record.get("t", {})
-            text = record.get("text", "")
-            bag_id = make_bag_id(
-                relation,
-                str(head.get("id", head.get("name", ""))),
-                str(tail.get("id", tail.get("name", ""))),
-            )
+            # Support multiple possible text field names (OpenNRE uses 'text', Arnor files use 'sentText')
+            text = record.get("text") or record.get("sentText") or record.get("sent_text") or ""
+
+            # Normalize head/tail to dicts. OpenNRE uses 'h'/'t' dicts; Arnor uses 'em1Text'/'em2Text' strings.
+            raw_h = record.get("h")
+            raw_t = record.get("t")
+            if isinstance(raw_h, dict):
+                head = raw_h
+            else:
+                h_name = record.get("em1Text") or record.get("em1") or (raw_h if isinstance(raw_h, str) else "")
+                head = {"name": str(h_name)} if h_name else {}
+            if isinstance(raw_t, dict):
+                tail = raw_t
+            else:
+                t_name = record.get("em2Text") or record.get("em2") or (raw_t if isinstance(raw_t, str) else "")
+                tail = {"name": str(t_name)} if t_name else {}
+
+            # If entityMentions present, try to find character spans for the head/tail mentions
+            # and populate a 'pos' entry (start,end) in head/tail to improve span extraction.
+            mentions = record.get("entityMentions") or record.get("entity_mentions") or []
+            def find_mention_span(name: str) -> Optional[Tuple[int,int]]:
+                if not name:
+                    return None
+                name_l = name.lower()
+                # First try to match mentions by their 'text' field
+                for m in mentions:
+                    m_text = m.get("text") or m.get("name") or ""
+                    if not m_text:
+                        continue
+                    if m_text.lower() == name_l:
+                        # If mention provides explicit char offsets, use them
+                        if "pos" in m and isinstance(m.get("pos"), (list, tuple)) and len(m.get("pos")) == 2:
+                            return (int(m.get("pos")[0]), int(m.get("pos")[1]))
+                        if "start" in m and "end" in m:
+                            try:
+                                return (int(m.get("start")), int(m.get("end")))
+                            except Exception:
+                                pass
+                        # Some datasets use token index 'start' only; fall back to string search below
+                        break
+                # Fallback: locate first substring occurrence in the sentence text
+                if name and text:
+                    idx = text.lower().find(name_l)
+                    if idx >= 0:
+                        return (idx, idx + len(name))
+                return None
+
+            # Try to fill pos for head/tail if possible
+            if mentions:
+                if head.get("name") and not head.get("pos"):
+                    span = find_mention_span(head.get("name"))
+                    if span:
+                        head["pos"] = [span[0], span[1]]
+                if tail.get("name") and not tail.get("pos"):
+                    span = find_mention_span(tail.get("name"))
+                    if span:
+                        tail["pos"] = [span[0], span[1]]
+
+            # Build bag id from available id or name fields
+            h_id = head.get("id") if isinstance(head.get("id"), (str, int)) else head.get("name", "")
+            t_id = tail.get("id") if isinstance(tail.get("id"), (str, int)) else tail.get("name", "")
+            bag_id = make_bag_id(relation, str(h_id), str(t_id))
             if limit_bags and bag_id not in bags and len(order) >= limit_bags:
                 continue
             instance = SentenceInstance(
@@ -913,6 +967,8 @@ def main() -> None:
 
         bags, bag_order = load_dataset(input_path, limit_bags=args.limit_bags)
         stats = StatsTracker(enable_noise_eval=args.evaluate_noise)
+        # Collect per-sentence info for this input file so we can dump it to JSON.
+        per_file_sentences: List[Dict[str, Any]] = []
         # Track unknown relations by sentence count
         unknown_relations: Counter = Counter()
 
@@ -946,6 +1002,7 @@ def main() -> None:
                 mask = policy.select(scores)
                 bag_kept = 0
                 for sent, keep, att in zip(bag, mask, scores):
+                    # Normalize is_noise to a boolean or None
                     noise_label = sent.data.get("is_noise")
                     if isinstance(noise_label, str):
                         lowered = noise_label.lower()
@@ -959,6 +1016,20 @@ def main() -> None:
                         noise_label_bool = noise_label
                     else:
                         noise_label_bool = None
+
+                    # Record per-sentence info for later dump
+                    per_file_sentences.append(
+                        {
+                            "text": sent.text,
+                            "relation": sent.relation,
+                            "h_name": sent.h_name,
+                            "t_name": sent.t_name,
+                            "score": float(att),
+                            "is_noise": noise_label_bool,
+                            "kept": bool(keep),
+                        }
+                    )
+
                     stats.record_noise(keep=keep, noise_label=noise_label_bool)
                     if keep:
                         record = dict(sent.data)
@@ -979,6 +1050,24 @@ def main() -> None:
             {"relation": rel, "count": cnt} for rel, cnt in unknown_relations.most_common()
         ]
         all_reports.append({"input": str(input_path), "report": report})
+
+        # Write per-file sentences JSON next to report or output
+        if args.report:
+            report_path = Path(args.report)
+            if report_path.exists() and report_path.is_dir():
+                sentences_outf = report_path / f"{input_path.stem}_sentences.json"
+            else:
+                # if single file target, when multiple inputs we append the stem
+                if len(input_paths) > 1:
+                    ensure_dir(report_path)
+                    sentences_outf = report_path.with_name(report_path.stem + f"_{input_path.stem}").with_suffix(report_path.suffix or ".json")
+                else:
+                    sentences_outf = report_path
+        else:
+            sentences_outf = output_path.with_name(f"{input_path.stem}_sentences.json")
+        ensure_dir(sentences_outf)
+        with sentences_outf.open("w") as f:
+            json.dump(per_file_sentences, f, indent=2)
 
         # Optionally write per-file JSON report next to output or to --report if provided
         if args.report:
@@ -1015,7 +1104,7 @@ if __name__ == "__main__":
 
 
 # 使用例：
-# python3 filter/main.py --split train --limit-bags 5 --policy topk --topk 1 --output tmp/nyt10m_train_filtered_sample.txt
+# python3 filter/main.py --split train --limit-bags 5 --policy topk --topk 2 --output tmp/nyt10m_train_filtered_sample.txt
 # python3 filter/main.py --split train --limit-bags 2 --policy drop --drop-bottom 1 --output tmp/nyt10m_train_filtered_sample.txt
 # --policy topk --topk N
 # --policy absolute --threshold T
@@ -1028,6 +1117,7 @@ if __name__ == "__main__":
 
 # python3 filter/main.py --input data/arnor_test.txt --policy absolute --threshold 0.012 --evaluate-noise --output tmp/arnor_filtered_full.txt
 
+# python3 filter/main.py --process-arnor-three --limit-bags 200 --policy topk --topk 2 --evaluate-noise --report reports
 
 # TP（True Positive）：确实是噪声并被过滤掉的句子，说明过滤器成功删掉 40 条标注为噪声的样本。
 # FP（False Positive）：原本是干净句子却被误删的 164 条，越少越好。
