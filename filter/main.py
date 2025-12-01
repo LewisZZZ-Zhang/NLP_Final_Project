@@ -71,10 +71,8 @@ def _plot_scores_if_requested(
     enabled: bool,
     bins: int,
     dpi: int,
-    bin_width: Optional[float],
     zoom_upper: Optional[float],
     zoom_bins: int,
-    zoom_bin_width: Optional[float],
 ) -> None:
     """Render a histogram of attention scores, if plotting is enabled."""
     if not enabled or not scores:
@@ -90,7 +88,6 @@ def _plot_scores_if_requested(
         plot_distribution(
             scores=scores["all"],
             bins=bins,
-            bin_width=bin_width,
             output_path=output_path,
             title=title,
             dpi=dpi,
@@ -102,7 +99,6 @@ def _plot_scores_if_requested(
             plot_distribution(
                 scores=scores["all"],
                 bins=zoom_bins,
-                bin_width=zoom_bin_width or bin_width,
                 output_path=zoom_out,
                 title=f"{title} (0-{zoom_upper:.2f})",
                 dpi=dpi,
@@ -116,7 +112,6 @@ def _plot_scores_if_requested(
                 clean_scores=scores["clean"],
                 noise_scores=scores["noise"],
                 bins=bins,
-                bin_width=bin_width,
                 output_path=noise_plot,
                 title=f"Clean vs noise scores ({input_label})",
                 dpi=dpi,
@@ -128,7 +123,6 @@ def _plot_scores_if_requested(
                     clean_scores=scores["clean"],
                     noise_scores=scores["noise"],
                     bins=zoom_bins,
-                    bin_width=zoom_bin_width or bin_width,
                     output_path=zoom_noise_plot,
                     title=f"Clean vs noise scores ({input_label}) (0-{zoom_upper:.2f})",
                     dpi=dpi,
@@ -625,11 +619,6 @@ def parse_args() -> argparse.Namespace:
         help="Image DPI for score plots.",
     )
     parser.add_argument(
-        "--plot-bin-width",
-        type=float,
-        help="Optional fixed bar width for score plots (e.g., 0.01). Overrides --plot-bins.",
-    )
-    parser.add_argument(
         "--plot-zoom-upper",
         type=float,
         default=0.15,
@@ -640,11 +629,6 @@ def parse_args() -> argparse.Namespace:
         type=int,
         default=80,
         help="Histogram bins for zoomed score plots.",
-    )
-    parser.add_argument(
-        "--plot-zoom-bin-width",
-        type=float,
-        help="Optional fixed bar width for zoomed plots. Overrides --plot-zoom-bins.",
     )
     parser.add_argument(
         "--limit-bags",
@@ -844,10 +828,8 @@ def main() -> None:
             enabled=args.plot_scores,
             bins=args.plot_bins,
             dpi=args.plot_dpi,
-            bin_width=args.plot_bin_width,
             zoom_upper=args.plot_zoom_upper,
             zoom_bins=args.plot_zoom_bins,
-            zoom_bin_width=args.plot_zoom_bin_width,
         )
 
     # After processing all files, print a concise per-file unknown-relations summary

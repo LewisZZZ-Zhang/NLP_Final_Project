@@ -34,11 +34,6 @@ def parse_args() -> argparse.Namespace:
         help="Number of histogram bins (increase for finer units).",
     )
     parser.add_argument(
-        "--bin-width",
-        type=float,
-        help="Optional fixed bar width. If set, overrides --bins (e.g., 0.01).",
-    )
-    parser.add_argument(
         "--dpi",
         type=int,
         default=150,
@@ -63,11 +58,6 @@ def parse_args() -> argparse.Namespace:
         type=int,
         default=150,
         help="Number of bins for the zoomed-in plot (finer detail).",
-    )
-    parser.add_argument(
-        "--zoom-bin-width",
-        type=float,
-        help="Optional fixed bar width for the zoomed-in plot. Overrides --zoom-bins.",
     )
     return parser.parse_args()
 
@@ -101,7 +91,6 @@ def plot_distribution(
     title: str,
     dpi: int,
     xlim: Optional[Tuple[float, float]] = None,
-    bin_width: Optional[float] = None,
 ) -> None:
     output_path.parent.mkdir(parents=True, exist_ok=True)
     if not scores:
@@ -120,7 +109,7 @@ def plot_distribution(
     fig, ax = plt.subplots(figsize=(8, 5))
     ax.hist(
         scores_window,
-        bins=_resolve_bins(scores_window, bins, xlim, bin_width),
+        bins=bins,
         color="#4e79a7",
         edgecolor="#1f3b57",
         alpha=0.9,
@@ -151,7 +140,6 @@ def plot_noise_vs_clean(
     title: str,
     dpi: int,
     xlim: Optional[Tuple[float, float]] = None,
-    bin_width: Optional[float] = None,
 ) -> None:
     """Mirror clean vs noise histograms along the X axis for easy comparison."""
     output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -160,8 +148,8 @@ def plot_noise_vs_clean(
     fig, ax = plt.subplots(figsize=(8, 6))
 
     # Positive bars for clean, negative (mirrored) for noise to create symmetry about X axis.
-    clean_counts, edges = _hist_counts(clean_scores, bins, xlim, bin_width)
-    noise_counts, _ = _hist_counts(noise_scores, bins, xlim, bin_width)
+    clean_counts, edges = _hist_counts(clean_scores, bins, xlim)
+    noise_counts, _ = _hist_counts(noise_scores, bins, xlim)
     edges_arr = np.asarray(edges)
     centers = (edges_arr[:-1] + edges_arr[1:]) / 2.0
     width = edges_arr[1] - edges_arr[0] if len(edges_arr) > 1 else 1.0
@@ -181,37 +169,15 @@ def plot_noise_vs_clean(
     fig.savefig(output_path, dpi=dpi)
 
 
-def _resolve_bins(
-    scores: Sequence[float],
-    bins: int,
-    xlim: Optional[Tuple[float, float]],
-    bin_width: Optional[float],
-):
-    if bin_width:
-        if xlim:
-            low, high = xlim
-        else:
-            low, high = min(scores), max(scores)
-        if high <= low:
-            high = low + bin_width
-        edges = np.arange(low, high + bin_width, bin_width)
-        if len(edges) < 2:
-            edges = np.array([low, low + bin_width])
-        return edges
-    return bins
-
-
 def _hist_counts(
     scores: Sequence[float],
     bins: int,
     xlim: Optional[Tuple[float, float]] = None,
-    bin_width: Optional[float] = None,
 ) -> Tuple[List[float], List[float]]:
     if not scores:
         return [], [0.0, 1.0]
     hist_range = xlim if xlim else None
-    bins_param = _resolve_bins(scores, bins, xlim, bin_width)
-    counts, edges = np.histogram(scores, bins=bins_param, range=hist_range)
+    counts, edges = np.histogram(scores, bins=bins, range=hist_range)
     return counts.tolist(), edges.tolist()
 
 
@@ -226,20 +192,12 @@ def main() -> None:
     )
     subtitle = "kept" if args.kept_only else "all"
     title = args.title or f"Score distribution ({subtitle} sentences)"
-    plot_distribution(
-        scores,
-        bins=args.bins,
-        bin_width=args.bin_width,
-        output_path=output_path,
-        title=title,
-        dpi=args.dpi,
-    )
+    plot_distribution(scores, bins=args.bins, output_path=output_path, title=title, dpi=args.dpi)
     if args.zoom_upper:
         zoom_out = output_path.with_name(output_path.stem + f"_0-{args.zoom_upper:.2f}.png")
         plot_distribution(
             scores,
             bins=args.zoom_bins,
-            bin_width=args.zoom_bin_width or args.bin_width,
             output_path=zoom_out,
             title=f"{title} (0-{args.zoom_upper:.2f})",
             dpi=args.dpi,
