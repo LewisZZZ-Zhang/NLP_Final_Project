@@ -238,3 +238,8 @@ python3 filter/main.py \
   --input OpenNRE/benchmark/arnor_converted/arnor_test.txt \
   --policy absolute --threshold 0.012 --evaluate-noise \
   --output tmp/arnor_filtered_full.txt
+
+python3 filter/main.py \
+  --input OpenNRE/benchmark/arnor_converted/arnor_dev.txt \
+  --policy absolute --threshold 0.003 --evaluate-noise \
+  --output tmp/arnor_filtered_full.txt
