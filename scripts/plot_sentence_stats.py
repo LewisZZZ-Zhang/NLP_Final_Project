@@ -132,17 +132,6 @@ def plot_for_file(path: Path, out_pdf: Path, top_relations: int = 10):
         pdf.savefig()
         plt.close()
 
-    # Page 5: violin plots split by is_noise for top relations
-    if top_n:
-        plt.figure(figsize=(10, max(6, len(top_n) * 0.6)))
-        sns.violinplot(y="relation", x="score", hue="is_noise_cat", data=df[df["relation"].isin(top_n)], order=top_n, split=True, palette="Set2")
-        plt.title(f"Score violin by is_noise for top-{top_relations} relations")
-        plt.xlabel("score")
-        plt.legend(title="is_noise")
-        plt.tight_layout()
-        pdf.savefig()
-        plt.close()
-
     # Page 6: scatter score vs kept (jitter) colored by is_noise
     plt.figure(figsize=(8, 6))
     # Jitter kept to show two rows using numpy
@@ -186,7 +175,7 @@ def plot_for_file(path: Path, out_pdf: Path, top_relations: int = 10):
     rel_series = df['relation'].fillna('').astype(str)
     is_na_mask = rel_series.str.strip().str.lower() == 'na'
 
-    def plot_na_group(group_df, title_prefix: str):
+    def plot_na_group(group_df, title_prefix: str, binary_only: bool = False):
         if group_df.empty:
             return
         grp = group_df.copy()
@@ -197,7 +186,12 @@ def plot_for_file(path: Path, out_pdf: Path, top_relations: int = 10):
         else:
             bins = np.linspace(min_s, max_s, 21)
         fig, ax = plt.subplots(figsize=(8, 5))
+        # Optionally restrict to only the two explicit categories: 'true' and 'false'
         cats = grp['is_noise_cat'].unique().tolist()
+        if binary_only:
+            cats = [c for c in ['true', 'false'] if c in cats]
+        if not cats:
+            return
         widths = (bins[1] - bins[0]) * 0.9
         n_cats = max(1, len(cats))
         offsets = np.linspace(-0.4, 0.4, n_cats)
@@ -214,10 +208,59 @@ def plot_for_file(path: Path, out_pdf: Path, top_relations: int = 10):
         pdf.savefig(fig)
         plt.close(fig)
 
-    # Page: NA scores
-    plot_na_group(df[is_na_mask], "NA (all relations labeled 'NA')")
-    # Page: non-NA scores
-    plot_na_group(df[~is_na_mask], "Non-NA (all relations except 'NA')")
+    # Page: NA scores (only keep 'true' and 'false' is_noise categories — drop 'missing')
+    plot_na_group(df[is_na_mask], "NA (all relations labeled 'NA')", binary_only=True)
+    # Page: non-NA scores (only keep 'true' and 'false' is_noise categories)
+    plot_na_group(df[~is_na_mask], "Non-NA (all relations except 'NA')", binary_only=True)
+
+    # Add violin plots for NA and non-NA (split by is_noise, only 'true'/'false')
+    def plot_na_violin(group_df, title_prefix: str):
+        """Draw a horizontal, split violin where the upper half is `true` (orange)
+        and the lower half is `false` (blue). If seaborn split violins aren't
+        available, fall back to two horizontal violins stacked vertically.
+        """
+        if group_df.empty:
+            return
+        grp = group_df[group_df['is_noise_cat'].isin(['true', 'false'])].copy()
+        if grp.empty:
+            return
+        # Create a dummy single-category column so seaborn draws one combined violin
+        grp['_single_group'] = 'all'
+        fig, ax = plt.subplots(figsize=(8, 5))
+        palette = {'true': '#ff7f0e', 'false': '#1f77b4'}
+        try:
+            # Use a split horizontal violin: x=score, y=dummy, hue=is_noise_cat
+            sns.violinplot(x='score', y='_single_group', hue='is_noise_cat', data=grp,
+                           split=True, inner='quartile', orient='h', palette=palette,
+                           hue_order=['true', 'false'], ax=ax)
+            # Cosmetic: remove y-axis labels/ticks (single group)
+            ax.set_yticks([])
+            ax.set_ylabel("")
+            ax.set_xlabel('score')
+            ax.set_title(f"{title_prefix} — Score violin (true=orange / false=blue)\nTotal sentences: {len(grp)}")
+            # Ensure legend shows the two categories clearly
+            handles, labels = ax.get_legend_handles_labels()
+            if handles:
+                ax.legend(handles, labels, title='is_noise', loc='best')
+        except Exception:
+            # Fallback: draw two horizontal violins in two rows (false on bottom, true on top)
+            try:
+                temp = grp.copy()
+                temp['is_noise_cat'] = pd.Categorical(temp['is_noise_cat'], categories=['false', 'true'])
+                sns.violinplot(x='score', y='is_noise_cat', data=temp, order=['true', 'false'], orient='h', palette=palette, ax=ax)
+                ax.set_xlabel('score')
+                ax.set_title(f"{title_prefix} — Score violin (true=orange / false=blue)\nTotal sentences: {len(grp)}")
+            except Exception:
+                # As a last resort, boxplot
+                sns.boxplot(x='score', y='is_noise_cat', data=grp, order=['true', 'false'], orient='h', palette=palette, ax=ax)
+        plt.tight_layout()
+        pdf.savefig(fig)
+        plt.close(fig)
+
+    # Violin page: NA
+    plot_na_violin(df[is_na_mask], "NA (all relations labeled 'NA')")
+    # Violin page: non-NA
+    plot_na_violin(df[~is_na_mask], "Non-NA (all relations except 'NA')")
     for rel in relations:
         rel_df = df[df['relation'] == rel].copy()
         # build entity pairs
