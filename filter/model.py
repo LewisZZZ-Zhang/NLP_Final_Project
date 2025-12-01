@@ -27,7 +27,7 @@ RELATION_HINTS: Dict[str, Dict[str, Any]] = {
     "NA": {
         "keywords": [],
         "between": [],
-        "bias": -0.15,
+        "bias": -0.25,
     },
     "/location/location/contains": {
         "keywords": [
@@ -41,7 +41,7 @@ RELATION_HINTS: Dict[str, Dict[str, Any]] = {
             " bordered by",
         ],
         "between": [" in ", " of ", ", ", " near ", " along "],
-        "bias": 0.18,
+        "bias": 0.12,
     },
     "location/location/contains": {  # alias form without leading slash
         "keywords": [
@@ -55,7 +55,7 @@ RELATION_HINTS: Dict[str, Dict[str, Any]] = {
             " bordered by",
         ],
         "between": [" in ", " of ", ", ", " near ", " along "],
-        "bias": 0.18,
+        "bias": 0.12,
     },
     "/people/person/place_lived": {
         "keywords": [
@@ -69,6 +69,9 @@ RELATION_HINTS: Dict[str, Dict[str, Any]] = {
             "settled",
             "home in",
             "raised in",
+            "moved to",
+            "born in",
+            "resides in",
         ],
         "between": [" in ", " at ", " from ", " near "],
         "bias": 0.32,
@@ -91,6 +94,11 @@ RELATION_HINTS: Dict[str, Dict[str, Any]] = {
             "chinese": 0.02,
             "french": 0.02,
             "british": 0.02,
+            "german": 0.02,
+            "spanish": 0.02,
+            "italian": 0.02,
+            "russian": 0.02,
+            "indian": 0.02,
         },
     },
     "/business/person/company": {
@@ -421,19 +429,25 @@ class HeuristicAttentionProvider(AttentionProvider):
         between = self._between_score(instance)
         keyword = self._keyword_score(instance, hint)
         order = self._order_score(instance, hint)
+        uncertainty = self._uncertainty_penalty(instance)
+        clutter = self._clutter_penalty(instance)
+        overlap_pen = self._overlap_penalty(instance)
         bias = hint.get("bias", RELATION_HINTS["default"]["bias"])
         boosts = hint.get("boosts", {})
         extra = sum(weight for token, weight in boosts.items() if token in instance.text_lower)
         raw = (
-            0.30 * dist
-            + 0.20 * between
-            + 0.35 * keyword
-            + 0.15 * order
+            0.28 * dist
+            + 0.18 * between
+            + 0.38 * keyword
+            + 0.16 * order
             + bias
             + extra
         )
+        raw -= uncertainty
+        raw -= clutter
+        raw -= overlap_pen
         if instance.relation == "NA":
-            raw *= 0.3
+            raw *= 0.25
         return clamp(raw, 0.0, 1.5)
 
     def _distance_score(self, instance: SentenceInstance) -> float:
@@ -448,8 +462,8 @@ class HeuristicAttentionProvider(AttentionProvider):
         if not between:
             return 1.0
         token_count = max(1, len(between.split()))
-        # Encourage concise contexts; clamp after ~25 words for tighter precision.
-        return clamp(1.0 - (token_count / 25.0))
+        # Encourage concise contexts; clamp after ~20 words for tighter precision.
+        return clamp(1.0 - (token_count / 20.0))
 
     def _keyword_score(self, instance: SentenceInstance, hint: Dict[str, Any]) -> float:
         text_lower = instance.text_lower
@@ -477,6 +491,44 @@ class HeuristicAttentionProvider(AttentionProvider):
         h_first = instance.h_pos[0] <= instance.t_pos[0]
         expect_head = preferred == "h-first"
         return 1.0 if h_first == expect_head else 0.5
+
+    def _uncertainty_penalty(self, instance: SentenceInstance) -> float:
+        """Penalize sentences with hedging/uncertain language."""
+        cues = {
+            "alleged",
+            "allegedly",
+            "rumor",
+            "rumour",
+            "reportedly",
+            "claimed",
+            "unconfirmed",
+            "may",
+            "might",
+            "could",
+            "suspected",
+        }
+        hits = sum(1 for cue in cues if cue in instance.text_lower)
+        return min(0.25, 0.05 * hits)
+
+    def _clutter_penalty(self, instance: SentenceInstance) -> float:
+        """Penalize sentences that are heavy lists or cluttered with commas/semicolons."""
+        count = instance.text.count(",") + instance.text.count(";")
+        if count <= 2:
+            return 0.0
+        return min(0.2, 0.04 * (count - 2))
+
+    def _overlap_penalty(self, instance: SentenceInstance) -> float:
+        """Reduce score if head/tail spans overlap or are extremely close (often noise)."""
+        h_start, h_end = instance.h_pos
+        t_start, t_end = instance.t_pos
+        overlap = max(0, min(h_end, t_end) - max(h_start, t_start))
+        if overlap > 0:
+            return 0.15
+        # Very tiny separation (characters) is often noisy in this dataset.
+        gap = abs((h_start + h_end) / 2 - (t_start + t_end) / 2)
+        if gap < 5:
+            return 0.08
+        return 0.0
 
     def _get_hint(self, relation: str) -> Dict[str, Any]:
         if relation not in self._hint_cache:
