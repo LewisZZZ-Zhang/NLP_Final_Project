@@ -19,6 +19,7 @@ from __future__ import annotations
 import argparse
 import json
 import logging
+import time
 from collections import Counter
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence, Tuple
@@ -45,6 +46,13 @@ def make_bag_id(relation: str, head_id: str, tail_id: str) -> str:
 def ensure_dir(path: Path) -> None:
     if not path.parent.exists():
         path.parent.mkdir(parents=True, exist_ok=True)
+
+
+def log_elapsed(start: float, label: str) -> None:
+    """Log a human-friendly elapsed time message."""
+    elapsed = time.perf_counter() - start
+    LOGGER.info("%s completed in %.2fs", label, elapsed)
+    print(f"{label} time: {elapsed:.2f}s")
 
 
 def safe_extract_span(text: str, entry: Dict[str, Any]) -> Tuple[int, int]:
@@ -709,6 +717,7 @@ def main() -> None:
         )
         ensure_dir(output_path)
 
+        filter_start = time.perf_counter()
         bags, bag_order = load_dataset(input_path, limit_bags=args.limit_bags)
         stats = StatsTracker(enable_noise_eval=args.evaluate_noise)
         # Collect per-sentence info for this input file so we can dump it to JSON.
@@ -853,6 +862,7 @@ def main() -> None:
             zoom_upper=args.plot_zoom_upper,
             zoom_bins=args.plot_zoom_bins,
         )
+        log_elapsed(filter_start, f"Filtering {input_path.name}")
 
     # After processing all files, print a concise per-file unknown-relations summary
     print("\n=== Unknown-relations summary (per file) ===")
