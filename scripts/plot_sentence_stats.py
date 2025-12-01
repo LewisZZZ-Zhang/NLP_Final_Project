@@ -180,6 +180,44 @@ def plot_for_file(path: Path, out_pdf: Path, top_relations: int = 10):
     MAX_REL_PAGES = 2000
     pairs_page_count = 0
     relations = df['relation'].fillna('UNKNOWN').unique().tolist()
+
+    # New pages: overall NA vs non-NA score distributions (two pages)
+    # Define NA mask (case-insensitive match to 'NA')
+    rel_series = df['relation'].fillna('').astype(str)
+    is_na_mask = rel_series.str.strip().str.lower() == 'na'
+
+    def plot_na_group(group_df, title_prefix: str):
+        if group_df.empty:
+            return
+        grp = group_df.copy()
+        min_s = float(grp['score'].min())
+        max_s = float(grp['score'].max())
+        if math.isclose(min_s, max_s):
+            bins = np.linspace(min_s - 0.5, max_s + 0.5, 11)
+        else:
+            bins = np.linspace(min_s, max_s, 21)
+        fig, ax = plt.subplots(figsize=(8, 5))
+        cats = grp['is_noise_cat'].unique().tolist()
+        widths = (bins[1] - bins[0]) * 0.9
+        n_cats = max(1, len(cats))
+        offsets = np.linspace(-0.4, 0.4, n_cats)
+        for i, cat in enumerate(sorted(cats)):
+            subset = grp[grp['is_noise_cat'] == cat]
+            counts, _ = np.histogram(subset['score'].fillna(0.0), bins=bins)
+            centers = (bins[:-1] + bins[1:]) / 2.0
+            ax.bar(centers + offsets[i] * (widths / (n_cats or 1)), counts, width=widths / (n_cats or 1), alpha=0.8, label=str(cat))
+        ax.set_title(f"{title_prefix} — Score histogram (split by is_noise)\nTotal sentences: {len(grp)}")
+        ax.set_xlabel('score')
+        ax.set_ylabel('count')
+        ax.legend(title='is_noise')
+        plt.tight_layout()
+        pdf.savefig(fig)
+        plt.close(fig)
+
+    # Page: NA scores
+    plot_na_group(df[is_na_mask], "NA (all relations labeled 'NA')")
+    # Page: non-NA scores
+    plot_na_group(df[~is_na_mask], "Non-NA (all relations except 'NA')")
     for rel in relations:
         rel_df = df[df['relation'] == rel].copy()
         # build entity pairs
