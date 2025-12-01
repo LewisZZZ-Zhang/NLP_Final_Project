@@ -27,7 +27,7 @@ RELATION_HINTS: Dict[str, Dict[str, Any]] = {
     "NA": {
         "keywords": [],
         "between": [],
-        "bias": -0.05,
+        "bias": -0.15,
     },
     "/location/location/contains": {
         "keywords": [
@@ -41,7 +41,21 @@ RELATION_HINTS: Dict[str, Dict[str, Any]] = {
             " bordered by",
         ],
         "between": [" in ", " of ", ", ", " near ", " along "],
-        "bias": 0.25,
+        "bias": 0.18,
+    },
+    "location/location/contains": {  # alias form without leading slash
+        "keywords": [
+            " in ",
+            " within ",
+            " part of ",
+            " throughout ",
+            " across ",
+            " around ",
+            " near ",
+            " bordered by",
+        ],
+        "between": [" in ", " of ", ", ", " near ", " along "],
+        "bias": 0.18,
     },
     "/people/person/place_lived": {
         "keywords": [
@@ -145,6 +159,12 @@ RELATION_HINTS: Dict[str, Dict[str, Any]] = {
         "bias": 0.4,
         "boosts": {"died": 0.2, "killed": 0.15, "dead": 0.1},
     },
+    "/people/deceased_person/place_of_death": {  # alias with underscore
+        "keywords": ["died", "dead", "killed", "death", "passed away"],
+        "between": [" in ", " at "],
+        "bias": 0.4,
+        "boosts": {"died": 0.2, "killed": 0.15, "dead": 0.1},
+    },
     "/location/region/capital": {
         "keywords": ["capital", "seat"],
         "between": [" of ", " for "],
@@ -212,6 +232,11 @@ RELATION_HINTS: Dict[str, Dict[str, Any]] = {
         "bias": 0.4,
     },
     "/people/deceasedperson/place_of_burial": {
+        "keywords": ["buried", "burial", "interred", "laid to rest"],
+        "between": [" in ", " at "],
+        "bias": 0.38,
+    },
+    "/people/deceased_person/place_of_burial": {  # alias with underscore
         "keywords": ["buried", "burial", "interred", "laid to rest"],
         "between": [" in ", " at "],
         "bias": 0.38,
@@ -400,15 +425,15 @@ class HeuristicAttentionProvider(AttentionProvider):
         boosts = hint.get("boosts", {})
         extra = sum(weight for token, weight in boosts.items() if token in instance.text_lower)
         raw = (
-            0.35 * dist
-            + 0.25 * between
-            + 0.3 * keyword
-            + 0.1 * order
+            0.30 * dist
+            + 0.20 * between
+            + 0.35 * keyword
+            + 0.15 * order
             + bias
             + extra
         )
         if instance.relation == "NA":
-            raw *= 0.4
+            raw *= 0.3
         return clamp(raw, 0.0, 1.5)
 
     def _distance_score(self, instance: SentenceInstance) -> float:
@@ -423,8 +448,8 @@ class HeuristicAttentionProvider(AttentionProvider):
         if not between:
             return 1.0
         token_count = max(1, len(between.split()))
-        # Encourage concise contexts; clamp after ~35 words.
-        return clamp(1.0 - (token_count / 35.0))
+        # Encourage concise contexts; clamp after ~25 words for tighter precision.
+        return clamp(1.0 - (token_count / 25.0))
 
     def _keyword_score(self, instance: SentenceInstance, hint: Dict[str, Any]) -> float:
         text_lower = instance.text_lower
@@ -508,4 +533,3 @@ class ExternalAttentionProvider(AttentionProvider):
                 return self._fallback.get_scores(bag_id, sentences)
             return [score / total for score in cached]
         return self._fallback.get_scores(bag_id, sentences)
-

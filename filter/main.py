@@ -248,12 +248,17 @@ class FilterPolicy:
 
 
 class AbsoluteThresholdPolicy(FilterPolicy):
-    def __init__(self, threshold: float, min_keep: int = 1):
+    def __init__(self, threshold: float, min_keep: int = 1, scale_by_bag_size: bool = False):
         super().__init__(min_keep)
         self.threshold = threshold
+        self.scale_by_bag_size = scale_by_bag_size
 
     def select(self, scores: Sequence[float]) -> List[bool]:
-        mask = [score >= self.threshold for score in scores]
+        if not scores:
+            return []
+        # If scaling is enabled, interpret threshold as "per-sentence mass" relative to bag size.
+        effective_threshold = self.threshold / len(scores) if self.scale_by_bag_size else self.threshold
+        mask = [score >= effective_threshold for score in scores]
         if sum(mask) >= self.min_keep:
             return mask
         # Fallback: keep at least `min_keep` highest sentences.
@@ -483,7 +488,11 @@ def build_attention_provider(args: argparse.Namespace) -> AttentionProvider:
 
 def build_policy(args: argparse.Namespace) -> FilterPolicy:
     if args.policy == "absolute":
-        return AbsoluteThresholdPolicy(threshold=args.threshold, min_keep=args.min_keep)
+        return AbsoluteThresholdPolicy(
+            threshold=args.threshold,
+            min_keep=args.min_keep,
+            scale_by_bag_size=args.absolute_scale_by_bag,
+        )
     if args.policy == "topk":
         return TopKPolicy(k=args.topk, min_keep=args.min_keep)
     if args.policy == "relative":
@@ -538,6 +547,19 @@ def parse_args() -> argparse.Namespace:
         type=float,
         default=0.18,
         help="Attention threshold for 'absolute' policy.",
+    )
+    parser.add_argument(
+        "--absolute-scale-by-bag",
+        dest="absolute_scale_by_bag",
+        action="store_true",
+        default=False,
+        help="Scale absolute threshold by bag size so it represents per-sentence mass (default: off).",
+    )
+    parser.add_argument(
+        "--no-absolute-scale-by-bag",
+        dest="absolute_scale_by_bag",
+        action="store_false",
+        help="Disable bag-size scaling for absolute threshold.",
     )
     parser.add_argument(
         "--topk",
@@ -869,3 +891,9 @@ if __name__ == "__main__":
 # FP（False Positive）：原本是干净句子却被误删的 164 条，越少越好。
 # FN（False Negative）：原本是噪声但被保留下来的 219 条，意味着还有很多噪声没被过滤。
 # TN（True Negative）：干净句子且被保留下来的 627 条。
+
+
+# python3 filter/main.py \
+#   --input OpenNRE/benchmark/arnor_converted/arnor_test.txt \
+#   --policy absolute --threshold 0.012 --evaluate-noise \
+#   --output tmp/arnor_filtered_full.txt

@@ -232,3 +232,9 @@ python3 ARNOR-master/main.py --train=True --clean=True --use_small=False --epoch
 --first_loop_epoch=1: 当 bootstrap（config 中的一个开关，默认 True）开启时，脚本先运行 first_loop_epoch 个 epoch 作为“第一轮”，随后运行 epoch - first_loop_epoch 个 epoch 做后续循环。若 bootstrap=False，脚本直接用 epoch 做完整训练轮数。
 其它相关 flags（命令里没给但脚本支持）：--restore（是否从检查点恢复）、--dropout、--batchsize、--lr 等，均在 main.py 的 flags 定义中可查。
 
+
+
+python3 filter/main.py \
+  --input OpenNRE/benchmark/arnor_converted/arnor_test.txt \
+  --policy absolute --threshold 0.012 --evaluate-noise \
+  --output tmp/arnor_filtered_full.txt
