@@ -19,238 +19,27 @@ from __future__ import annotations
 import argparse
 import json
 import logging
-import math
 from collections import Counter
-from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
+from typing import Any, Dict, List, Optional, Sequence, Tuple
+
+from model import (
+    AttentionProvider,
+    ExternalAttentionProvider,
+    HeuristicAttentionProvider,
+    RELATION_HINTS,
+    SentenceInstance,
+    clamp,
+)
 
 
 LOGGER = logging.getLogger("nyt10m_filter")
-
-
-# Relation-specific lexical hints. These are intentionally lightweight and only capture
-# the most obvious trigger words so the heuristics remain interpretable and easy to
-# extend later with real attention signals.
-RELATION_HINTS: Dict[str, Dict[str, Any]] = {
-    "default": {
-        "keywords": [],
-        "between": [" in ", " of ", " near ", " at ", " with "],
-        "preferred_order": "any",
-        "bias": 0.05,
-        "boosts": {},
-    },
-    "NA": {
-        "keywords": [],
-        "between": [],
-        "bias": -0.05,
-    },
-    "/location/location/contains": {
-        "keywords": [
-            " in ",
-            " within ",
-            " part of ",
-            " throughout ",
-            " across ",
-            " around ",
-            " near ",
-            " bordered by",
-        ],
-        "between": [" in ", " of ", ", ", " near ", " along "],
-        "bias": 0.25,
-    },
-    "/people/person/place_lived": {
-        "keywords": [
-            " lives",
-            " lived",
-            " living",
-            " resides",
-            " resident",
-            "based in",
-            "grew up",
-            "settled",
-            "home in",
-            "raised in",
-        ],
-        "between": [" in ", " at ", " from ", " near "],
-        "bias": 0.32,
-        "boosts": {"home": 0.05, "native": 0.05},
-    },
-    "/people/person/nationality": {
-        "keywords": [
-            "national",
-            "citizen",
-            "native",
-            "from",
-            "born",
-            "hails from",
-            "ethnicity",
-        ],
-        "between": [" of ", " from "],
-        "bias": 0.3,
-        "boosts": {
-            "american": 0.02,
-            "chinese": 0.02,
-            "french": 0.02,
-            "british": 0.02,
-        },
-    },
-    "/business/person/company": {
-        "keywords": [
-            "chief",
-            "executive",
-            "works at",
-            "employee",
-            "president",
-            "chairman",
-            "ceo",
-            "director",
-            "lead",
-            "co-founder",
-        ],
-        "between": [" at ", " with ", " of "],
-        "preferred_order": "h-first",
-        "bias": 0.28,
-    },
-    "/location/neighborhood/neighborhood_of": {
-        "keywords": [
-            "neighborhood",
-            "district",
-            "borough",
-            "section",
-            "area",
-            "part of",
-        ],
-        "between": [" in ", " of ", ", "],
-        "bias": 0.25,
-    },
-    "/location/country/administrative_divisions": {
-        "keywords": [
-            "province",
-            "state",
-            "district",
-            "region",
-            "municipality",
-            "prefecture",
-        ],
-        "between": [" of ", " in "],
-        "preferred_order": "t-first",
-        "bias": 0.27,
-    },
-    "/location/country/capital": {
-        "keywords": ["capital", "seat of", "capital city"],
-        "between": [" of ", " for "],
-        "bias": 0.4,
-        "preferred_order": "t-first",
-    },
-    "/location/administrative_division/country": {
-        "keywords": ["country", "nation", "republic", "state"],
-        "between": [" in ", " of "],
-        "preferred_order": "h-first",
-        "bias": 0.25,
-    },
-    "/people/person/place_of_birth": {
-        "keywords": ["born", "birthplace", "delivery"],
-        "between": [" in ", " at "],
-        "bias": 0.4,
-        "boosts": {"born": 0.2, "birth": 0.1, "delivered": 0.1},
-    },
-    "/people/deceasedperson/place_of_death": {
-        "keywords": ["died", "dead", "killed", "death", "passed away"],
-        "between": [" in ", " at "],
-        "bias": 0.4,
-        "boosts": {"died": 0.2, "killed": 0.15, "dead": 0.1},
-    },
-    "/location/region/capital": {
-        "keywords": ["capital", "seat"],
-        "between": [" of ", " for "],
-        "bias": 0.35,
-    },
-    "/business/company/founders": {
-        "keywords": ["founded", "founder", "co-founder", "established", "started"],
-        "between": [" by ", " from "],
-        "preferred_order": "t-first",
-        "bias": 0.35,
-    },
-    "/people/person/children": {
-        "keywords": ["son", "daughter", "child", "children", "kids"],
-        "between": [" and ", ", ", " with "],
-        "bias": 0.32,
-    },
-    "/business/company/place_founded": {
-        "keywords": ["founded", "established", "formed", "launched"],
-        "between": [" in ", " at "],
-        "preferred_order": "h-first",
-        "bias": 0.33,
-    },
-    "/business/location": {
-        "keywords": ["based", "headquartered", "office", "located", "operates"],
-        "between": [" in ", " at "],
-        "bias": 0.3,
-    },
-    "/business/company/majorshareholders": {
-        "keywords": ["shareholder", "owns", "stake", "holding", "owner"],
-        "between": [" in ", " of "],
-        "bias": 0.35,
-    },
-    "/people/person/religion": {
-        "keywords": [
-            "religion",
-            "faith",
-            "catholic",
-            "christian",
-            "muslim",
-            "jewish",
-            "buddhist",
-            "hindu",
-        ],
-        "between": [" of ", " in "],
-        "bias": 0.3,
-    },
-    "/people/person/ethnicity": {
-        "keywords": ["ethnicity", "ethnic", "heritage", "ancestry", "roots"],
-        "between": [" of ", " from "],
-        "bias": 0.28,
-    },
-    "/business/company/advisors": {
-        "keywords": ["advisor", "adviser", "consultant", "counsel"],
-        "between": [" to ", " for "],
-        "bias": 0.3,
-    },
-    "/people/ethnicity/geographic_distribution": {
-        "keywords": ["community", "population", "diaspora", "settled", "live"],
-        "between": [" in ", " across ", " throughout "],
-        "bias": 0.22,
-    },
-    "/location/us_county/county_seat": {
-        "keywords": ["county seat"],
-        "between": [" of ", " for "],
-        "bias": 0.4,
-    },
-    "/people/deceasedperson/place_of_burial": {
-        "keywords": ["buried", "burial", "interred", "laid to rest"],
-        "between": [" in ", " at "],
-        "bias": 0.38,
-    },
-    "/film/film/featured_film_locations": {
-        "keywords": ["filmed", "shot", "set in", "location"],
-        "between": [" in ", " at "],
-        "bias": 0.35,
-    },
-    "/time/event/locations": {
-        "keywords": ["held", "hosted", "took place", "took place in", "took place at"],
-        "between": [" in ", " at "],
-        "bias": 0.33,
-    },
-}
 
 
 def make_bag_id(relation: str, head_id: str, tail_id: str) -> str:
     return f"{relation}||{head_id}||{tail_id}"
 
 
-def clamp(value: float, minimum: float = 0.0, maximum: float = 1.0) -> float:
-    return max(minimum, min(maximum, value))
 
 
 def ensure_dir(path: Path) -> None:
@@ -275,33 +64,79 @@ def safe_extract_span(text: str, entry: Dict[str, Any]) -> Tuple[int, int]:
     return int(start), int(end)
 
 
-@dataclass
-class SentenceInstance:
-    relation: str
-    text: str
-    text_lower: str
-    h_name: str
-    t_name: str
-    h_pos: Tuple[int, int]
-    t_pos: Tuple[int, int]
-    data: Dict[str, Any]
-    _between_cache: Optional[str] = field(default=None, init=False, repr=False)
-
-    def between_text(self) -> str:
-        if self._between_cache is None:
-            h_start, h_end = self.h_pos
-            t_start, t_end = self.t_pos
-            if h_start <= t_start:
-                left, right = h_end, t_start
-            else:
-                left, right = t_end, h_start
-            left = max(0, min(len(self.text), left))
-            right = max(0, min(len(self.text), right))
-            if left >= right:
-                self._between_cache = ""
-            else:
-                self._between_cache = self.text_lower[left:right]
-        return self._between_cache
+def _plot_scores_if_requested(
+    scores: Dict[str, List[float]],
+    output_path: Path,
+    input_label: str,
+    enabled: bool,
+    bins: int,
+    dpi: int,
+    bin_width: Optional[float],
+    zoom_upper: Optional[float],
+    zoom_bins: int,
+    zoom_bin_width: Optional[float],
+) -> None:
+    """Render a histogram of attention scores, if plotting is enabled."""
+    if not enabled or not scores:
+        return
+    try:
+        from plot_scores import plot_distribution, plot_noise_vs_clean  # Local helper; uses matplotlib with Agg backend.
+    except Exception as exc:  # pragma: no cover - best-effort plotting
+        LOGGER.warning("Skipping score plot (dependency missing): %s", exc)
+        return
+    title = f"Score distribution ({input_label})"
+    try:
+        # Overall distribution
+        plot_distribution(
+            scores=scores["all"],
+            bins=bins,
+            bin_width=bin_width,
+            output_path=output_path,
+            title=title,
+            dpi=dpi,
+        )
+        print(f"Saved score distribution plot to {output_path}")
+        # Zoomed-in overall distribution if requested.
+        if zoom_upper:
+            zoom_out = output_path.with_name(output_path.stem + f"_0-{zoom_upper:.2f}.png")
+            plot_distribution(
+                scores=scores["all"],
+                bins=zoom_bins,
+                bin_width=zoom_bin_width or bin_width,
+                output_path=zoom_out,
+                title=f"{title} (0-{zoom_upper:.2f})",
+                dpi=dpi,
+                xlim=(0.0, zoom_upper),
+            )
+            print(f"Saved zoomed score distribution plot to {zoom_out}")
+        # Mirrored clean vs noise plot if labels available.
+        if scores["clean"] or scores["noise"]:
+            noise_plot = output_path.with_name(output_path.stem + "_noise_split.png")
+            plot_noise_vs_clean(
+                clean_scores=scores["clean"],
+                noise_scores=scores["noise"],
+                bins=bins,
+                bin_width=bin_width,
+                output_path=noise_plot,
+                title=f"Clean vs noise scores ({input_label})",
+                dpi=dpi,
+            )
+            print(f"Saved clean/noise split plot to {noise_plot}")
+            if zoom_upper:
+                zoom_noise_plot = output_path.with_name(output_path.stem + f"_noise_split_0-{zoom_upper:.2f}.png")
+                plot_noise_vs_clean(
+                    clean_scores=scores["clean"],
+                    noise_scores=scores["noise"],
+                    bins=zoom_bins,
+                    bin_width=zoom_bin_width or bin_width,
+                    output_path=zoom_noise_plot,
+                    title=f"Clean vs noise scores ({input_label}) (0-{zoom_upper:.2f})",
+                    dpi=dpi,
+                    xlim=(0.0, zoom_upper),
+                )
+                print(f"Saved zoomed clean/noise split plot to {zoom_noise_plot}")
+    except Exception as exc:  # pragma: no cover - best-effort plotting
+        LOGGER.warning("Failed to plot scores for %s: %s", input_label, exc)
 
 
 def load_dataset(
@@ -343,7 +178,8 @@ def load_dataset(
             # If entityMentions present, try to find character spans for the head/tail mentions
             # and populate a 'pos' entry (start,end) in head/tail to improve span extraction.
             mentions = record.get("entityMentions") or record.get("entity_mentions") or []
-            def find_mention_span(name: str) -> Optional[Tuple[int,int]]:
+
+            def find_mention_span(name: str) -> Optional[Tuple[int, int]]:
                 if not name:
                     return None
                 name_l = name.lower()
@@ -407,151 +243,6 @@ def load_dataset(
     return bags, order
 
 
-class AttentionProvider:
-    def get_scores(self, bag_id: str, sentences: Sequence[SentenceInstance]) -> List[float]:
-        raise NotImplementedError
-
-
-class HeuristicAttentionProvider(AttentionProvider):
-    def __init__(self, temperature: float = 0.7):
-        self.temperature = max(temperature, 1e-3)
-        self._hint_cache: Dict[str, Dict[str, Any]] = {}
-
-    def get_scores(self, bag_id: str, sentences: Sequence[SentenceInstance]) -> List[float]:
-        if not sentences:
-            return []
-        raw_scores = [self._score_sentence(sent) for sent in sentences]
-        if len(raw_scores) == 1:
-            return [1.0]
-        max_score = max(raw_scores)
-        if max_score <= 0:
-            uniform = 1.0 / len(raw_scores)
-            return [uniform for _ in raw_scores]
-        exps = [math.exp((score - max_score) / self.temperature) for score in raw_scores]
-        denom = sum(exps)
-        if denom == 0:
-            uniform = 1.0 / len(raw_scores)
-            return [uniform for _ in raw_scores]
-        return [val / denom for val in exps]
-
-    def _score_sentence(self, instance: SentenceInstance) -> float:
-        hint = self._get_hint(instance.relation)
-        dist = self._distance_score(instance)
-        between = self._between_score(instance)
-        keyword = self._keyword_score(instance, hint)
-        order = self._order_score(instance, hint)
-        bias = hint.get("bias", RELATION_HINTS["default"]["bias"])
-        boosts = hint.get("boosts", {})
-        extra = sum(weight for token, weight in boosts.items() if token in instance.text_lower)
-        raw = (
-            0.35 * dist
-            + 0.25 * between
-            + 0.3 * keyword
-            + 0.1 * order
-            + bias
-            + extra
-        )
-        if instance.relation == "NA":
-            raw *= 0.4
-        return clamp(raw, 0.0, 1.5)
-
-    def _distance_score(self, instance: SentenceInstance) -> float:
-        text_len = max(len(instance.text), 1)
-        h_center = (instance.h_pos[0] + instance.h_pos[1]) / 2
-        t_center = (instance.t_pos[0] + instance.t_pos[1]) / 2
-        dist = abs(h_center - t_center) / text_len
-        return clamp(1.0 - dist * 1.3)
-
-    def _between_score(self, instance: SentenceInstance) -> float:
-        between = instance.between_text()
-        if not between:
-            return 1.0
-        token_count = max(1, len(between.split()))
-        # Encourage concise contexts; clamp after ~35 words.
-        return clamp(1.0 - (token_count / 35.0))
-
-    def _keyword_score(self, instance: SentenceInstance, hint: Dict[str, Any]) -> float:
-        text_lower = instance.text_lower
-        between = instance.between_text()
-        keywords = hint.get("keywords", [])
-        between_keywords = hint.get("between", [])
-        score = 0.0
-        weight = 0.0
-        for kw in keywords:
-            weight += 1.0
-            if kw in text_lower:
-                score += 1.0
-        for kw in between_keywords:
-            weight += 0.5
-            if kw in between:
-                score += 0.5
-        if weight == 0:
-            return 0.0
-        return clamp(score / weight)
-
-    def _order_score(self, instance: SentenceInstance, hint: Dict[str, Any]) -> float:
-        preferred = hint.get("preferred_order", "any")
-        if preferred == "any":
-            return 1.0
-        h_first = instance.h_pos[0] <= instance.t_pos[0]
-        expect_head = preferred == "h-first"
-        return 1.0 if h_first == expect_head else 0.5
-
-    def _get_hint(self, relation: str) -> Dict[str, Any]:
-        if relation not in self._hint_cache:
-            merged = {**RELATION_HINTS["default"]}
-            specific = RELATION_HINTS.get(relation)
-            if specific:
-                for key, value in specific.items():
-                    if isinstance(value, list):
-                        merged[key] = list(value)
-                    elif isinstance(value, dict):
-                        merged[key] = dict(value)
-                    else:
-                        merged[key] = value
-            self._hint_cache[relation] = merged
-        return self._hint_cache[relation]
-
-
-class ExternalAttentionProvider(AttentionProvider):
-    """
-    Optional attention provider that loads per-bag attention scores from disk.
-
-    Expected file format: one JSON object per line with either
-        {"bag_id": "<relation>||<h_id>||<t_id>", "scores": [0.2, 0.8, ...]}
-    or
-        {"bag_id": "...", "attentions": [...]}
-    Extra fields are ignored. Bags without entries fall back to the heuristic provider.
-    """
-
-    def __init__(self, path: Path, fallback: Optional[AttentionProvider] = None):
-        self._scores: Dict[str, List[float]] = {}
-        self._fallback = fallback or HeuristicAttentionProvider()
-        LOGGER.info("Loading external attention from %s", path)
-        with path.open() as f:
-            for line in f:
-                line = line.strip()
-                if not line:
-                    continue
-                try:
-                    payload = json.loads(line)
-                except json.JSONDecodeError:
-                    continue
-                bag_id = payload.get("bag_id")
-                scores = payload.get("scores") or payload.get("attentions")
-                if not bag_id or not isinstance(scores, list):
-                    continue
-                self._scores[bag_id] = [float(x) for x in scores]
-        LOGGER.info("Loaded attention for %d bags", len(self._scores))
-
-    def get_scores(self, bag_id: str, sentences: Sequence[SentenceInstance]) -> List[float]:
-        cached = self._scores.get(bag_id)
-        if cached and len(cached) == len(sentences):
-            total = sum(cached)
-            if total <= 0:
-                return self._fallback.get_scores(bag_id, sentences)
-            return [score / total for score in cached]
-        return self._fallback.get_scores(bag_id, sentences)
 
 
 class FilterPolicy:
@@ -909,6 +600,53 @@ def parse_args() -> argparse.Namespace:
         help="Optional path to dump a JSON summary of filtering statistics.",
     )
     parser.add_argument(
+        "--plot-scores",
+        dest="plot_scores",
+        action="store_true",
+        default=True,
+        help="Automatically plot score distribution for each processed input (default: on).",
+    )
+    parser.add_argument(
+        "--no-plot-scores",
+        dest="plot_scores",
+        action="store_false",
+        help="Disable score distribution plotting.",
+    )
+    parser.add_argument(
+        "--plot-bins",
+        type=int,
+        default=40,
+        help="Histogram bins for score plots.",
+    )
+    parser.add_argument(
+        "--plot-dpi",
+        type=int,
+        default=150,
+        help="Image DPI for score plots.",
+    )
+    parser.add_argument(
+        "--plot-bin-width",
+        type=float,
+        help="Optional fixed bar width for score plots (e.g., 0.01). Overrides --plot-bins.",
+    )
+    parser.add_argument(
+        "--plot-zoom-upper",
+        type=float,
+        default=0.15,
+        help="If set, also emit zoomed plots for scores in [0, this value].",
+    )
+    parser.add_argument(
+        "--plot-zoom-bins",
+        type=int,
+        default=80,
+        help="Histogram bins for zoomed score plots.",
+    )
+    parser.add_argument(
+        "--plot-zoom-bin-width",
+        type=float,
+        help="Optional fixed bar width for zoomed plots. Overrides --plot-zoom-bins.",
+    )
+    parser.add_argument(
         "--limit-bags",
         type=int,
         help="Debug option: only load the first N bags.",
@@ -1085,6 +823,32 @@ def main() -> None:
             ensure_dir(outf)
             with outf.open("w") as f:
                 json.dump(report, f, indent=2)
+
+        # Plot score distribution for this input, if requested.
+        score_values_all = [float(entry["score"]) for entry in per_file_sentences if "score" in entry]
+        score_values_clean = [
+            float(entry["score"])
+            for entry in per_file_sentences
+            if "score" in entry and entry.get("is_noise") is False
+        ]
+        score_values_noise = [
+            float(entry["score"])
+            for entry in per_file_sentences
+            if "score" in entry and entry.get("is_noise") is True
+        ]
+        plot_out = output_path.with_name(f"{output_path.stem}_score_distribution.png")
+        _plot_scores_if_requested(
+            scores={"all": score_values_all, "clean": score_values_clean, "noise": score_values_noise},
+            output_path=plot_out,
+            input_label=input_path.name,
+            enabled=args.plot_scores,
+            bins=args.plot_bins,
+            dpi=args.plot_dpi,
+            bin_width=args.plot_bin_width,
+            zoom_upper=args.plot_zoom_upper,
+            zoom_bins=args.plot_zoom_bins,
+            zoom_bin_width=args.plot_zoom_bin_width,
+        )
 
     # After processing all files, print a concise per-file unknown-relations summary
     print("\n=== Unknown-relations summary (per file) ===")
