@@ -167,7 +167,7 @@ def main():
                         default=['data/arnor_dataset-2.0.0/dev.json',
                                  'data/arnor_dataset-2.0.0/test.json',
                                  'data/arnor_dataset-2.0.0/test_noise.json'])
-    parser.add_argument('--outdir', default='OpenNRE/benchmark/arnor_converted',
+    parser.add_argument('--outdir', default='data/arnor_converted',
                         help='Output directory to write converted files and rel2id files')
     args = parser.parse_args()
 
