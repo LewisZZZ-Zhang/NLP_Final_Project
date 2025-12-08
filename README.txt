@@ -269,7 +269,6 @@ python3 filter/main.py \
   --policy absolute --threshold 0.0025 --evaluate-noise \
   --output tmp/arnor_filtered_full.txt
 
-
 python3 filter/main.py \
 --input OpenNRE/benchmark/arnor_converted/arnor_dev.txt \
 --policy drop_pct --drop-percent 0.2 \
