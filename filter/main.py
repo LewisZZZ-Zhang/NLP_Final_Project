@@ -73,8 +73,16 @@ def _plot_scores_if_requested(
     dpi: int,
     zoom_upper: Optional[float],
     zoom_bins: int,
+    policy: Optional[str] = None,
+    threshold: Optional[float] = None,
+    plot_bin_width: Optional[float] = None,
+    plot_zoom_bin_width: Optional[float] = None,
 ) -> None:
-    """Render a histogram of attention scores, if plotting is enabled."""
+    """Render a histogram of attention scores, if plotting is enabled.
+
+    When `policy == 'absolute'` and `threshold` is provided, the plots will mark
+    the threshold location with a vertical line.
+    """
     if not enabled or not scores:
         return
     try:
@@ -84,28 +92,8 @@ def _plot_scores_if_requested(
         return
     title = f"Score distribution ({input_label})"
     try:
-        # Overall distribution
-        plot_distribution(
-            scores=scores["all"],
-            bins=bins,
-            output_path=output_path,
-            title=title,
-            dpi=dpi,
-        )
-        print(f"Saved score distribution plot to {output_path}")
-        # Zoomed-in overall distribution if requested.
-        if zoom_upper:
-            zoom_out = output_path.with_name(output_path.stem + f"_0-{zoom_upper:.2f}.png")
-            plot_distribution(
-                scores=scores["all"],
-                bins=zoom_bins,
-                output_path=zoom_out,
-                title=f"{title} (0-{zoom_upper:.2f})",
-                dpi=dpi,
-                xlim=(0.0, zoom_upper),
-            )
-            print(f"Saved zoomed score distribution plot to {zoom_out}")
-        # Mirrored clean vs noise plot if labels available.
+        # NOTE: overall distribution plots intentionally omitted per user request.
+        # The function will still emit the clean/noise split plots (below) when labels exist.
         if scores["clean"] or scores["noise"]:
             noise_plot = output_path.with_name(output_path.stem + "_noise_split.png")
             plot_noise_vs_clean(
@@ -115,6 +103,10 @@ def _plot_scores_if_requested(
                 output_path=noise_plot,
                 title=f"Clean vs noise scores ({input_label})",
                 dpi=dpi,
+                policy=policy,
+                threshold=threshold,
+                bin_width=plot_bin_width,
+                highlight_zoom=zoom_upper,
             )
             print(f"Saved clean/noise split plot to {noise_plot}")
             if zoom_upper:
@@ -127,6 +119,10 @@ def _plot_scores_if_requested(
                     title=f"Clean vs noise scores ({input_label}) (0-{zoom_upper:.2f})",
                     dpi=dpi,
                     xlim=(0.0, zoom_upper),
+                    policy=policy,
+                    threshold=threshold,
+                        bin_width=plot_zoom_bin_width,
+                        highlight_zoom=zoom_upper,
                 )
                 print(f"Saved zoomed clean/noise split plot to {zoom_noise_plot}")
     except Exception as exc:  # pragma: no cover - best-effort plotting
@@ -643,7 +639,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--plot-zoom-upper",
         type=float,
-        default=0.15,
+        default=0.1,
         help="If set, also emit zoomed plots for scores in [0, this value].",
     )
     parser.add_argument(
@@ -651,6 +647,18 @@ def parse_args() -> argparse.Namespace:
         type=int,
         default=80,
         help="Histogram bins for zoomed score plots.",
+    )
+    parser.add_argument(
+        "--plot-bin-width",
+        type=float,
+        default=0.005,
+        help="Bin width for full-range score plots (overrides --plot-bins if set).",
+    )
+    parser.add_argument(
+        "--plot-zoom-bin-width",
+        type=float,
+        default=0.0005,
+        help="Bin width for zoomed score plots (overrides --plot-zoom-bins if set).",
     )
     parser.add_argument(
         "--limit-bags",
@@ -852,6 +860,10 @@ def main() -> None:
             dpi=args.plot_dpi,
             zoom_upper=args.plot_zoom_upper,
             zoom_bins=args.plot_zoom_bins,
+            policy=args.policy,
+            threshold=args.threshold,
+            plot_bin_width=args.plot_bin_width,
+            plot_zoom_bin_width=args.plot_zoom_bin_width,
         )
 
     # After processing all files, print a concise per-file unknown-relations summary
@@ -871,29 +883,3 @@ if __name__ == "__main__":
     main()
 
 
-# 使用例：
-# python3 filter/main.py --split train --limit-bags 5 --policy topk --topk 2 --output tmp/nyt10m_train_filtered_sample.txt
-# python3 filter/main.py --split train --limit-bags 2 --policy drop --drop-bottom 1 --output tmp/nyt10m_train_filtered_sample.txt
-# --policy topk --topk N
-# --policy absolute --threshold T
-# --policy relative --margin M
-# --min-keep
-# --policy drop --drop-bottom K
-# python3 filter/main.py --input data/arnor_test.txt --policy drop --drop-bottom 10 --limit-bags 10 --evaluate-noise --output tmp/arnor_filtered.txt
-# python3 filter/main.py --input data/arnor_test.txt --policy drop_pct --drop-percent 0.5 --limit-bags 10 --evaluate-noise --output tmp/arnor_filtered.txt
-# python3 filter/main.py --input data/arnor_test_filtered.txt --policy drop_pct --drop-percent 0.2 --evaluate-noise --output tmp/arnor_filtered_full.txt
-
-# python3 filter/main.py --input data/arnor_test.txt --policy absolute --threshold 0.012 --evaluate-noise --output tmp/arnor_filtered_full.txt
-
-# python3 filter/main.py --process-arnor-three --limit-bags 200 --policy topk --topk 2 --evaluate-noise --report reports
-
-# TP（True Positive）：确实是噪声并被过滤掉的句子，说明过滤器成功删掉 40 条标注为噪声的样本。
-# FP（False Positive）：原本是干净句子却被误删的 164 条，越少越好。
-# FN（False Negative）：原本是噪声但被保留下来的 219 条，意味着还有很多噪声没被过滤。
-# TN（True Negative）：干净句子且被保留下来的 627 条。
-
-
-# python3 filter/main.py \
-#   --input OpenNRE/benchmark/arnor_converted/arnor_test.txt \
-#   --policy absolute --threshold 0.012 --evaluate-noise \
-#   --output tmp/arnor_filtered_full.txt

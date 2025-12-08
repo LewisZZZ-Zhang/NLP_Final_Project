@@ -232,6 +232,26 @@ python3 ARNOR-master/main.py --train=True --clean=True --use_small=False --epoch
 --first_loop_epoch=1: 当 bootstrap（config 中的一个开关，默认 True）开启时，脚本先运行 first_loop_epoch 个 epoch 作为“第一轮”，随后运行 epoch - first_loop_epoch 个 epoch 做后续循环。若 bootstrap=False，脚本直接用 epoch 做完整训练轮数。
 其它相关 flags（命令里没给但脚本支持）：--restore（是否从检查点恢复）、--dropout、--batchsize、--lr 等，均在 main.py 的 flags 定义中可查。
 
+使用例：
+python3 filter/main.py --split train --limit-bags 5 --policy topk --topk 2 --output tmp/nyt10m_train_filtered_sample.txt
+python3 filter/main.py --split train --limit-bags 2 --policy drop --drop-bottom 1 --output tmp/nyt10m_train_filtered_sample.txt
+--policy topk --topk N
+--policy absolute --threshold T
+--policy relative --margin M
+--min-keep
+--policy drop --drop-bottom K
+python3 filter/main.py --input data/arnor_test.txt --policy drop --drop-bottom 10 --limit-bags 10 --evaluate-noise --output tmp/arnor_filtered.txt
+python3 filter/main.py --input data/arnor_test.txt --policy drop_pct --drop-percent 0.5 --limit-bags 10 --evaluate-noise --output tmp/arnor_filtered.txt
+python3 filter/main.py --input data/arnor_test_filtered.txt --policy drop_pct --drop-percent 0.2 --evaluate-noise --output tmp/arnor_filtered_full.txt
+
+python3 filter/main.py --input data/arnor_test.txt --policy absolute --threshold 0.012 --evaluate-noise --output tmp/arnor_filtered_full.txt
+
+python3 filter/main.py --process-arnor-three --limit-bags 200 --policy topk --topk 2 --evaluate-noise --report reports
+
+TP（True Positive）：确实是噪声并被过滤掉的句子，说明过滤器成功删掉 40 条标注为噪声的样本。
+FP（False Positive）：原本是干净句子却被误删的 164 条，越少越好。
+FN（False Negative）：原本是噪声但被保留下来的 219 条，意味着还有很多噪声没被过滤。
+TN（True Negative）：干净句子且被保留下来的 627 条。
 
 
 python3 filter/main.py \
@@ -240,6 +260,18 @@ python3 filter/main.py \
   --output tmp/arnor_filtered_full.txt
 
 python3 filter/main.py \
-  --input OpenNRE/benchmark/arnor_converted/arnor_dev.txt \
-  --policy absolute --threshold 0.003 --evaluate-noise \
+  --input OpenNRE/benchmark/arnor_converted/arnor_test.txt \
+  --policy absolute --threshold 0.012 --evaluate-noise \
   --output tmp/arnor_filtered_full.txt
+
+python3 filter/main.py \
+  --input OpenNRE/benchmark/arnor_converted/arnor_dev.txt \
+  --policy absolute --threshold 0.0025 --evaluate-noise \
+  --output tmp/arnor_filtered_full.txt
+
+
+python3 filter/main.py \
+--input OpenNRE/benchmark/arnor_converted/arnor_dev.txt \
+--policy drop_pct --drop-percent 0.2 \
+--evaluate-noise \
+--output tmp/arnor_filtered_full.txt
