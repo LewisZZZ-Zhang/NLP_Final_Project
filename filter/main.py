@@ -434,8 +434,8 @@ class StatsTracker:
         if noise_info:
             lines.append("Noise filtering evaluation (predict drop = noise):")
             lines.append(
-                "  precision={precision:.3f} recall={recall:.3f} f1={f1:.3f} "
-                "accuracy={accuracy:.3f}".format(**noise_info)
+                "  precision={precision:.4f} recall={recall:.4f} f1={f1:.4f} "
+                "accuracy={accuracy:.4f}".format(**noise_info)
             )
             lines.append(
                 f"  counts: TP={noise_info['tp']} FP={noise_info['fp']} "
