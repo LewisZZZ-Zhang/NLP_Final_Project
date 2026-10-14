@@ -1,3 +1,13 @@
+# Corrected evaluation and recall-first revision
+
+A post-course revision is available in [revisions/20261014](revisions/20261014/README.md), including corrected conversion, nine-feature L2 logistic filtering, reproduced experimental aggregates, and the [revised paper](revisions/20261014/paper/NLP_Overleaf_Revised.pdf). Original team attribution is preserved.
+
+The historical guide below describes the original submission. Its reported noise F1, global bag-softmax cutoff results, cross-task neural comparisons, and speedup claims are **superseded by the corrected audit** and should not be used as current performance evidence. The new high-recall results also discard most clean data; see the revision for the full trade-off and non-NA limitations.
+
+---
+
+## Historical reproduction guide (original submission)
+
 Reproduction Guide 
 
 **1. Clone the repo**

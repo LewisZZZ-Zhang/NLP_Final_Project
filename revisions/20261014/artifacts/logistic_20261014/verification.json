@@ -1,0 +1,99 @@
+{
+  "oof_logistic": {
+    "N": 4241,
+    "counts": {
+      "FN": 923,
+      "TN": 3031,
+      "TP": 129,
+      "FP": 158
+    },
+    "unique_ids": true
+  },
+  "oof_baseline": {
+    "N": 4241,
+    "counts": {
+      "TP": 138,
+      "FP": 103,
+      "FN": 914,
+      "TN": 3086
+    },
+    "unique_ids": true
+  },
+  "oof_guarded": {
+    "N": 4241,
+    "counts": {
+      "TP": 181,
+      "FP": 135,
+      "FN": 871,
+      "TN": 3054
+    },
+    "unique_ids": true
+  },
+  "test_logistic": {
+    "N": 4059,
+    "counts": {
+      "FN": 877,
+      "TN": 2937,
+      "TP": 106,
+      "FP": 139
+    },
+    "unique_ids": true
+  },
+  "test_baseline": {
+    "N": 4059,
+    "counts": {
+      "TP": 256,
+      "TN": 2821,
+      "FN": 727,
+      "FP": 255
+    },
+    "unique_ids": true
+  },
+  "test_guarded": {
+    "N": 4059,
+    "counts": {
+      "TP": 269,
+      "TN": 2790,
+      "FN": 714,
+      "FP": 286
+    },
+    "unique_ids": true
+  },
+  "test_noise_logistic": {
+    "N": 333,
+    "counts": {
+      "FN": 142,
+      "TN": 118,
+      "FP": 8,
+      "TP": 61
+    },
+    "unique_ids": true
+  },
+  "test_noise_baseline": {
+    "N": 333,
+    "counts": {
+      "FN": 202,
+      "TN": 120,
+      "FP": 6,
+      "TP": 1
+    },
+    "unique_ids": true
+  },
+  "test_noise_guarded": {
+    "N": 333,
+    "counts": {
+      "FN": 182,
+      "TN": 117,
+      "TP": 21,
+      "FP": 9
+    },
+    "unique_ids": true
+  },
+  "lineage": {
+    "inner_fits_verified": 100,
+    "train_validation_sentence_disjoint": true,
+    "outer_validation_excluded_from_tuning": true,
+    "scaler_means_scales_training_only": true,
+    "exported_predictions_reproduced": true
+  }
+}

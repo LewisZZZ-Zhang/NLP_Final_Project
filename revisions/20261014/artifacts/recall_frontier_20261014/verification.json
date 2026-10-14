@@ -1,0 +1,234 @@
+{
+  "90_oof_logistic": {
+    "N": 4241,
+    "kept": 587,
+    "counts": {
+      "TP": 975,
+      "FP": 2679,
+      "TN": 510,
+      "FN": 77
+    }
+  },
+  "90_oof_raw": {
+    "N": 4241,
+    "kept": 414,
+    "counts": {
+      "TP": 981,
+      "FP": 2846,
+      "TN": 343,
+      "FN": 71
+    }
+  },
+  "90_dev_logistic": {
+    "N": 4241,
+    "kept": 449,
+    "counts": {
+      "TP": 994,
+      "FP": 2798,
+      "TN": 391,
+      "FN": 58
+    }
+  },
+  "90_dev_raw": {
+    "N": 4241,
+    "kept": 323,
+    "counts": {
+      "TP": 999,
+      "FP": 2919,
+      "FN": 53,
+      "TN": 270
+    }
+  },
+  "90_test_logistic": {
+    "N": 4059,
+    "kept": 488,
+    "counts": {
+      "TP": 935,
+      "FP": 2636,
+      "FN": 48,
+      "TN": 440
+    }
+  },
+  "90_test_raw": {
+    "N": 4059,
+    "kept": 270,
+    "counts": {
+      "TP": 939,
+      "FP": 2850,
+      "TN": 226,
+      "FN": 44
+    }
+  },
+  "90_test_noise_logistic": {
+    "N": 333,
+    "kept": 14,
+    "counts": {
+      "TP": 200,
+      "FP": 115,
+      "TN": 11,
+      "FN": 3
+    }
+  },
+  "90_test_noise_raw": {
+    "N": 333,
+    "kept": 16,
+    "counts": {
+      "TP": 194,
+      "FP": 119,
+      "FN": 9,
+      "TN": 7
+    }
+  },
+  "95_oof_logistic": {
+    "N": 4241,
+    "kept": 318,
+    "counts": {
+      "TP": 1015,
+      "FP": 2908,
+      "FN": 37,
+      "TN": 281
+    }
+  },
+  "95_oof_raw": {
+    "N": 4241,
+    "kept": 310,
+    "counts": {
+      "TP": 1006,
+      "FP": 2925,
+      "TN": 264,
+      "FN": 46
+    }
+  },
+  "95_dev_logistic": {
+    "N": 4241,
+    "kept": 278,
+    "counts": {
+      "TP": 1018,
+      "FP": 2945,
+      "TN": 244,
+      "FN": 34
+    }
+  },
+  "95_dev_raw": {
+    "N": 4241,
+    "kept": 313,
+    "counts": {
+      "TP": 1006,
+      "FP": 2922,
+      "FN": 46,
+      "TN": 267
+    }
+  },
+  "95_test_logistic": {
+    "N": 4059,
+    "kept": 316,
+    "counts": {
+      "TP": 951,
+      "FP": 2792,
+      "FN": 32,
+      "TN": 284
+    }
+  },
+  "95_test_raw": {
+    "N": 4059,
+    "kept": 259,
+    "counts": {
+      "TP": 945,
+      "FP": 2855,
+      "TN": 221,
+      "FN": 38
+    }
+  },
+  "95_test_noise_logistic": {
+    "N": 333,
+    "kept": 9,
+    "counts": {
+      "TP": 200,
+      "FP": 120,
+      "TN": 6,
+      "FN": 3
+    }
+  },
+  "95_test_noise_raw": {
+    "N": 333,
+    "kept": 10,
+    "counts": {
+      "TP": 198,
+      "FP": 121,
+      "FN": 5,
+      "TN": 5
+    }
+  },
+  "99_oof_logistic": {
+    "N": 4241,
+    "kept": 70,
+    "counts": {
+      "TP": 1043,
+      "FP": 3128,
+      "TN": 61,
+      "FN": 9
+    }
+  },
+  "99_oof_raw": {
+    "N": 4241,
+    "kept": 4,
+    "counts": {
+      "TP": 1049,
+      "FP": 3188,
+      "FN": 3,
+      "TN": 1
+    }
+  },
+  "99_dev_logistic": {
+    "N": 4241,
+    "kept": 0,
+    "counts": {
+      "TP": 1052,
+      "FP": 3189
+    }
+  },
+  "99_dev_raw": {
+    "N": 4241,
+    "kept": 3,
+    "counts": {
+      "TP": 1050,
+      "FP": 3188,
+      "TN": 1,
+      "FN": 2
+    }
+  },
+  "99_test_logistic": {
+    "N": 4059,
+    "kept": 1,
+    "counts": {
+      "TP": 983,
+      "FP": 3075,
+      "TN": 1
+    }
+  },
+  "99_test_raw": {
+    "N": 4059,
+    "kept": 2,
+    "counts": {
+      "TP": 981,
+      "FP": 3076,
+      "FN": 2
+    }
+  },
+  "99_test_noise_logistic": {
+    "N": 333,
+    "kept": 0,
+    "counts": {
+      "TP": 203,
+      "FP": 126
+    }
+  },
+  "99_test_noise_raw": {
+    "N": 333,
+    "kept": 0,
+    "counts": {
+      "TP": 203,
+      "FP": 126
+    }
+  }
+}

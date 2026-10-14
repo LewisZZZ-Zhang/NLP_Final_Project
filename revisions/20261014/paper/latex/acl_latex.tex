@@ -1,0 +1,290 @@
+\documentclass[11pt]{article}
+
+% Change "review" to "final" to generate the final (sometimes called camera-ready) version.
+% Change to "preprint" to generate a non-anonymous version with page numbers.
+\usepackage[preprint]{acl}
+
+% Standard package includes
+\usepackage{times}
+\usepackage{latexsym}
+
+% For proper rendering and hyphenation of words containing Latin characters (including in bib files)
+\usepackage[T1]{fontenc}
+\usepackage{amsmath}
+% For Vietnamese characters
+% \usepackage[T5]{fontenc}
+% See https://www.latex-project.org/help/documentation/encguide.pdf for other character sets
+
+% This assumes your files are encoded as UTF8
+\usepackage[utf8]{inputenc}
+
+% This is not strictly necessary, and may be commented out,
+% but it will improve the layout of the manuscript,
+% and will typically save some space.
+\usepackage{microtype}
+
+% This is also not strictly necessary, and may be commented out.
+% However, it will improve the aesthetics of text in
+% the typewriter font.
+\usepackage{inconsolata}
+
+%Including images in your LaTeX document requires adding
+%additional package(s)
+\usepackage{graphicx}
+\usepackage{booktabs}
+
+% If the title and author information does not fit in the area allocated, uncomment the following
+%
+%\setlength\titlebox{<dim>}
+%
+% and set <dim> to something 5cm or larger.
+
+\title{A Lightweight Noise Filter for Distant Supervision\\
+\large Corrected Evaluation and Recall--Retention Trade-offs}
+
+% Author information can be set in various styles:
+% For several authors from the same institution:
+% \author{Author 1 \and ... \and Author n \\
+%         Address line \\ ... \\ Address line}
+% if the names do not fit well on one line use
+%         Author 1 \\ {\bf Author 2} \\ ... \\ {\bf Author n} \\
+% For authors from different institutions:
+% \author{Author 1 \\ Address line \\  ... \\ Address line
+%         \And  ... \And
+%         Author n \\ Address line \\ ... \\ Address line}
+% To start a separate ``row'' of authors use \AND, as in
+% \author{Author 1 \\ Address line \\  ... \\ Address line
+%         \AND
+%         Author 2 \\ Address line \\ ... \\ Address line \And
+%         Author 3 \\ Address line \\ ... \\ Address line}
+
+\author{
+   Zijun Wu \quad Tianchen Xie \quad Tianluo Zhang\\
+  % Department of Computer Science \\
+  New York University\\
+  % Shanghai, China \\
+  New York, USA \\
+  \texttt{\{zw4238, tx813, tz2668\}@nyu.edu}
+}
+
+%\author{
+%  \textbf{First Author\textsuperscript{1}},
+%  \textbf{Second Author\textsuperscript{1,2}},
+%  \textbf{Third T. Author\textsuperscript{1}},
+%  \textbf{Fourth Author\textsuperscript{1}},
+%\\
+%  \textbf{Fifth Author\textsuperscript{1,2}},
+%  \textbf{Sixth Author\textsuperscript{1}},
+%  \textbf{Seventh Author\textsuperscript{1}},
+%  \textbf{Eighth Author \textsuperscript{1,2,3,4}},
+%\\
+%  \textbf{Ninth Author\textsuperscript{1}},
+%  \textbf{Tenth Author\textsuperscript{1}},
+%  \textbf{Eleventh E. Author\textsuperscript{1,2,3,4,5}},
+%  \textbf{Twelfth Author\textsuperscript{1}},
+%\\
+%  \textbf{Thirteenth Author\textsuperscript{3}},
+%  \textbf{Fourteenth F. Author\textsuperscript{2,4}},
+%  \textbf{Fifteenth Author\textsuperscript{1}},
+%  \textbf{Sixteenth Author\textsuperscript{1}},
+%\\
+%  \textbf{Seventeenth S. Author\textsuperscript{4,5}},
+%  \textbf{Eighteenth Author\textsuperscript{3,4}},
+%  \textbf{Nineteenth N. Author\textsuperscript{2,5}},
+%  \textbf{Twentieth Author\textsuperscript{1}}
+%\\
+%\\
+%  \textsuperscript{1}Affiliation 1,
+%  \textsuperscript{2}Affiliation 2,
+%  \textsuperscript{3}Affiliation 3,
+%  \textsuperscript{4}Affiliation 4,
+%  \textsuperscript{5}Affiliation 5
+%\\
+%  \small{
+%    \textbf{Correspondence:} \href{mailto:email@domain}{email@domain}
+%  }
+%}
+
+\begin{document}
+\maketitle
+\begin{abstract}
+Distant supervision can attach a relation to a sentence that does not express it. We revisit a lightweight rule-based filter, correct its data conversion and evaluation, and study a noise-removal-first objective. The audit identifies sentence-local entity identifiers that merge unrelated pairs, unsuitable global thresholding of bag-normalized weights, and unknown noise annotations treated as clean. Alongside the training-free rule scorer, we evaluate L2-regularized logistic regression over nine existing features. Grouped nested development evaluation selects configurations for 90\%, 95\%, and 99\% target noise recall. On 4,059 valid instances of a previously inspected test set, the 90\% target configuration removes 95.12\% of labeled noise and yields 90.16\% retained-set purity, but preserves only 14.30\% of clean instances. Non-NA purity improves only slightly, from 75.74\% to 76.19\%. The highest-recall setting nearly deletes everything. These exploratory results support an interpretable recall--retention trade-off, not superiority over neural relation classifiers or demonstrated downstream improvement.
+\end{abstract}
+
+\noindent\textit{Revision note (14 October 2026).} This is a post-course revision of the original team project, prepared by Zijun Wu for review. The original author attribution is preserved; the new supervised extension is distinguished from the original training-free method. This draft does not imply coauthor approval or a new peer-reviewed publication. The original source and submitted report are archived separately.
+
+\section{Introduction}
+Relation extraction identifies semantic relations between entity mentions. Distant supervision aligns knowledge-base facts with text to obtain training examples without labeling every sentence \citep{mintz-etal-2009-distant}. However, a sentence mentioning the entities need not express the aligned relation. Our task is to decide whether to keep or reject a sentence--entity-pair--relation instance. One sentence can yield multiple instances; counts and throughput therefore refer to \emph{instances}, not unique sentences.
+
+We investigate how far simple lexical and positional features can support noise filtering. The original implementation combined hand-crafted scores with bag softmax and selection policies. An audit found defects in entity identities and evaluation, as well as unsupported comparisons with published relation-classification results. We correct those defects and add a small supervised model that learns feature weights without introducing neural representations.
+
+The final objective prioritizes removal of noisy instances. Pure recall maximization has a trivial solution: reject everything. We instead examine several target-recall operating points and retain as much clean data as possible within each target. The goals are (1) auditable data processing, (2) a reproducible comparison of raw rules and a learned linear combination, and (3) explicit reporting of clean-data loss, remaining corpus size, and non-NA behavior. We do not claim improved downstream relation extraction.
+
+\section{Related Work}
+\citet{mintz-etal-2009-distant} introduced distant supervision for relation extraction. Selective attention over instances aggregates evidence within entity-pair bags \citep{lin-etal-2016-neural}. ARNOR regularizes attention using relation patterns for distantly supervised relation classification \citep{jia-etal-2019-arnor}. These methods motivate attention to noisy supervision, but their published relation-classification scores are not interchangeable with our binary instance-level noise-detection scores.
+
+Our corrected comparisons are between filtering policies evaluated on the same valid instances. The rule scorer requires no fitting; the logistic extension uses labeled development data and must be called a lightweight \emph{supervised} model. Its transparency comes from explicit features and linear weights, not from absence of training or proof of semantic understanding.
+
+\section{The Framework}
+The corrected pipeline has four stages: preserve source provenance and validate entity spans; extract interpretable feature components; apply either a raw rule score or a standardized linear model; and threshold scores without forcing any instance to remain in a bag. Rejected valid instances and invalid-span records are distinct categories. Quarantined records are not automatically declared noisy.
+
+\subsection{Raw Rule Components}
+Let $h_c$ and $t_c$ denote character-level entity-span centers, and let $L=\max(\operatorname{len}(\mathrm{text}),1)$. Unless stated otherwise, $\operatorname{clamp}$ clips to $[0,1]$. The features are heuristic indicators; none guarantees that a relation is expressed.
+
+\paragraph{Distance.}
+The score is $\mathrm{dist}=\operatorname{clamp}(1-1.3|h_c-t_c|/L)$. It favors nearby mentions but does not establish a semantic relation.
+
+\paragraph{Between-context score.}
+For a nonempty intervening span with $n$ whitespace-separated tokens, $\mathrm{between}=\operatorname{clamp}(1-\max(1,n)/20)$. An empty intervening span receives 1.0. This special case matches the implementation.
+
+\paragraph{Keyword score.}
+Each relation has hand-written full-text and between-text cue lists. With $K_f,K_b$ cues in the respective lists and $S_f,S_b$ matched cues,
+\[
+\mathrm{keyword}=\operatorname{clamp}\left(\frac{S_f+0.5S_b}{K_f+0.5K_b}\right).
+\]
+A zero denominator yields zero. These are cue-list sizes, not knowledge-base fact counts. Matching is case-insensitive and uses word boundaries, avoiding accidental substring matches. Full-text cues can still be unrelated to the target pair; the final model retains this original feature definition.
+
+\paragraph{Order.}
+A relation-specific preferred surface order receives 1.0 when satisfied and 0.5 otherwise; relations without an order preference receive 1.0. Both orders can express a valid relation, so this is only a weak prior.
+
+\paragraph{Uncertainty and clutter.}
+With $u$ distinct matched uncertainty cues, the uncertainty penalty is $\min(0.25,0.05u)$. The original paper's coefficient 0.5 was a transcription error. With $n$ commas and semicolons, clutter is zero for $n\leq2$, otherwise $\min(0.2,0.04(n-2))$. Hedging and punctuation can occur in clean instances; the penalties are not reliable labels by themselves.
+
+\paragraph{Overlap.}
+The penalty is 0.15 for overlapping spans, 0.08 for nonoverlapping spans with $|h_c-t_c|<5$, and zero otherwise. The implementation uses center distance, not the gap between span edges. This feature is constant zero on the valid development population in this audit.
+
+\paragraph{Bias, boosts, and combination.}
+A hand-set relation bias $b_r$ (default 0.05; NA $-0.25$) and matched lexical boosts $v$ are combined as
+\[
+\begin{aligned}
+q={}&0.28\,\mathrm{dist}+0.18\,\mathrm{between}\\
+ &+0.38\,\mathrm{keyword}+0.16\,\mathrm{order}+b_r+v\\
+ &-\mathrm{uncertainty}-\mathrm{clutter}-\mathrm{overlap}.
+\end{aligned}
+\]
+The final raw score is $s=\operatorname{clip}_{[0,1.5]}(\gamma_r q)$, where $\gamma_r=0.25$ for NA and 1 otherwise. These constants are heuristic choices, not trained parameters.
+
+\subsection{Why Global Bag-Softmax Thresholding Was Removed}
+The historical method grouped instances by directed entity pair and relation, then computed $a_i=\exp(s_i/T)/\sum_j\exp(s_j/T)$ with $T=0.7$. A singleton necessarily receives weight 1.0, and adding a constant to all scores in a bag does not change the weights. A common relation bias therefore cancels in softmax before clipping, whereas NA score scaling changes its sharpness. Bag size also changes the scale of the weights. Consequently, these are relative within-bag weights, not calibrated global clean probabilities. The historical 0.0025 cutoff keeps all instances in the corrected evaluated bags and is not the final filtering configuration.
+
+Historical top-$k$, relative-margin, and drop-tail policies remain available for comparison, but their minimum-retention fallback prevents deletion of singleton noise. The final high-recall policies permit empty bags and do not require relation coverage.
+
+\subsection{Small Supervised Extension}
+The feature vector contains distance, between, keyword, order, boosts, uncertainty, clutter, overlap, and an NA indicator. It excludes the hand-set bias, total raw score, sentence text, entity names, bag size, and relation one-hot encoding. A StandardScaler and L2-regularized logistic regression estimate
+\[
+p_i=\sigma\left(b+\sum_{j=1}^{9}w_j\frac{x_{ij}-\mu_j}{\sigma_j}\right).
+\]
+Constant features use scale 1. Scaling parameters are fitted only on each training partition. The score is an uncalibrated probability estimate. A valid instance is rejected when $p_i\geq t_g$, with $g\in\{\mathrm{NA},\mathrm{non\mbox{-}NA}\}$.
+
+\section{Data and Evaluation Protocol}
+\subsection{Conversion and Valid Population}
+We use the local ARNOR-format NYT data associated with \citet{jia-etal-2019-arnor}. Each relation mention becomes an instance retaining its source split, line, mention index, original annotation, and candidate entity spans. The original converter reused sentence-local identifiers such as \texttt{h\_0} and \texttt{t\_0}, causing unrelated entity pairs to share bags. We replace them with hashes of case-sensitive surface forms normalized by Unicode NFC and whitespace normalization. This is not knowledge-base entity linking: homonyms and aliases remain limitations.
+
+Only instances with one unambiguous occurrence for each entity are scored. Ambiguous and missing spans are preserved for review. This restricts the population and can introduce selection bias. Unknown noise labels remain unknown, rather than becoming clean. The training split has no known noise labels and is not used to fit the logistic model.
+
+\begin{table}[t]
+\centering\small
+\begin{tabular}{lrrr}\toprule
+Split & Original & Valid & Known valid\\\midrule
+train & 367,893 & 324,039 & 0\\
+dev & 4,567 & 4,241 & 4,241\\
+test & 4,484 & 4,059 & 4,059\\
+test\_noise & 533 & 333 & 329\\\bottomrule
+\end{tabular}
+\caption{Relation-instance counts, not unique sentences. Invalid-span records are excluded from scoring; unknown annotations are excluded from labeled metrics.}\label{tab:data}
+\end{table}
+
+The valid test population contains 3,076 clean and 983 noisy instances. Its non-NA subset has 743 clean and 238 noisy instances. Development has 925 valid non-NA instances (672 clean; 253 noisy). The original test\_noise population contains 529 known annotations and four unknowns; all four unknowns remain in the valid subset.
+
+\subsection{Metrics and Baselines}
+Noise is the positive class. TP is rejected noise, FP rejected clean, FN retained noise, and TN retained clean. We report
+\[
+\begin{aligned}
+R_{\mathrm{noise}}&=\frac{TP}{TP+FN},\\
+C_{\mathrm{retained}}&=\frac{TN}{TN+FP},\\
+P_{\mathrm{retained}}&=\frac{TN}{TN+FN}.
+\end{aligned}
+\]
+Purity is undefined if no labeled instances remain. Counts of kept instances include unknowns; the fractions above do not. Noise precision and F1, per-relation metrics, bag sizes, and emptied relations are also saved in the audit artifacts.
+
+Baselines are keep-all, drop-all, and a raw-score threshold policy. Keep-all has zero noise recall and full clean retention; drop-all has full noise recall, zero clean retention, and undefined purity. Published CNN/PCNN/BiLSTM/ARNOR relation-classification numbers are removed from the comparison because the outcome and evaluation protocol differ.
+
+\subsection{Recall-First Threshold Selection}
+For targets $r\in\{0.90,0.95,0.99\}$, choose thresholds separately for NA and non-NA to maximize clean retention subject to fitted noise recall at least $r$. There is no minimum clean retention, no per-bag fallback, and no class-coverage constraint. Among equal clean-retention choices, prefer higher purity, lower deletion rate, then deterministic threshold order.
+
+Logistic thresholds use a grid from 0 to 1 in steps of 0.01, plus a keep-all endpoint. Raw thresholds use 0 to 1.51 in steps of 0.01; instances with scores below the threshold are rejected. Targets are illustrative operating choices, not literature standards or guarantees. The earlier 95\% \emph{clean-retention} requirement and the present 95\% \emph{noise-recall} target are distinct from each other and from a numeric classifier cutoff.
+
+\subsection{Grouped Nested Development Evaluation}
+Five deterministic folds keep identical normalized sentence texts together. Each outer validation fold is excluded from all model, scaler, and threshold tuning. Inner out-of-fold predictions on the remaining four folds select $C\in\{0.01,0.1,1,10\}$ and thresholds. C selection maximizes non-NA clean retention, then non-NA purity, then prefers lower overall inner log loss and smaller C. Full-dev fitting uses five inner folds. The optimizer is lbfgs with L2 regularization, no class weights, 2,000 maximum iterations, and tolerance $10^{-8}$.
+
+The recall-first experiment reuses audited inner predictions from the earlier logistic run because fitting and features are unchanged; only the selection objective changes. Cache hashes and source dependencies are checked, and the outer and full-dev models are refitted. Raw thresholds are fitted directly on the outer training partition. Thus the selection algorithms differ; the comparison is between the implemented policies. All final configurations are frozen before diagnostic evaluation, and all three targets are reported without selecting a winner from test results.
+
+The original splits share some normalized texts (eight dev--test and two dev--test\_noise). Both dev and test have also been inspected during successive repairs. Nested fitting prevents leakage within individual selection steps but cannot undo this adaptive reuse. These results are exploratory diagnostics, not a pristine independent test. Duplicate-excluded diagnostics are supplied in the result files.
+
+\section{Results}
+\subsection{Recall--Retention Trade-offs}
+Table~\ref{tab:frontier} reports development out-of-fold results and diagnostics on the previously inspected test subset. The logistic combination retains more clean instances than the raw policy in these aggregate comparisons, but both discard most useful supervision. Fitted constraints need not hold on new folds: at the 99\% target, logistic non-NA development recall is 98.42\%.
+
+\begin{table*}[t]
+\centering\small
+\begin{tabular}{llrrrrrrrr}\toprule
+&&\multicolumn{4}{c}{Development out-of-fold}&\multicolumn{4}{c}{Previously inspected test}\\
+Target&Method&Recall&Clean ret.&Purity&Kept&Recall&Clean ret.&Purity&Kept\\\midrule
+90\%&Raw&93.25&10.76&82.85&414&95.52&7.35&83.70&270\\
+90\%&Logistic&92.68&15.99&86.88&587&95.12&14.30&90.16&488\\
+95\%&Raw&95.63&8.28&85.16&310&96.13&7.18&85.33&259\\
+95\%&Logistic&96.48&8.81&88.36&318&96.74&9.23&89.87&316\\
+99\%&Raw&99.71&0.03&25.00&4&99.80&0.00&0.00&2\\
+99\%&Logistic&99.14&1.91&87.14&70&100.00&0.03&100.00&1\\\bottomrule
+\end{tabular}
+\caption{Noise recall, clean retention, and retained-set purity in percent. Kept counts are out of 4,241 dev and 4,059 test valid instances. A perfect score with one retained instance is not practically meaningful.}\label{tab:frontier}
+\end{table*}
+
+For the 90\% logistic target, test TP/FP/FN/TN are 935/2636/48/440. The retained 488 instances have 90.16\% purity, compared with 75.78\% under keep-all, but preserve only 440 of 3,076 clean instances (14.30\%). This is an enriched small subset, not broad preservation of training data. At the 95\% target, purity is slightly lower (89.87\%); deleting more noise need not improve purity because clean data are also lost. At 99\%, just one clean test instance remains.
+
+\subsection{Non-NA and Noise-Enriched Diagnostics}
+The aggregate result is not evidence of strong positive-relation understanding. At the 90\% target, the model keeps 63 non-NA test instances: 48 clean and 15 noisy. Purity is 76.19\%, close to the unfiltered 75.74\%, while clean retention is just 6.46\%. Table~\ref{tab:strata} makes this distinction explicit.
+
+\begin{table*}[t]
+\centering\small
+\begin{tabular}{llrrrr}\toprule
+Population & LR target & Noise recall & Clean retention & Purity & Kept / valid\\\midrule
+Dev OOF, non-NA &90\%&91.30&8.48&72.15&79 / 925\\
+Dev OOF, non-NA &95\%&97.23&2.53&70.83&24 / 925\\
+Test, non-NA &90\%&93.70&6.46&76.19&63 / 981\\
+Test, non-NA &95\%&95.38&4.04&73.17&41 / 981\\
+Test\_noise, overall &90\%&98.52&8.73&78.57&14 / 333\\
+Test\_noise, overall &95\%&98.52&4.76&66.67&9 / 333\\
+Test\_noise, overall &99\%&100.00&0.00&Undefined&0 / 333\\\bottomrule
+\end{tabular}
+\caption{Stratified logistic diagnostics in percent. test\_noise includes four unknown annotations, excluded from labeled metrics.}\label{tab:strata}
+\end{table*}
+
+The 90\% configuration retains 11 clean and three noisy instances on test\_noise. The 99\% configuration retains none there. Its noise recall is 100\%, but purity is undefined; it offers no retained training corpus.
+
+\subsection{Earlier Variants and Feature Limits}
+Separate thresholds and local keyword variants did not establish a reliable high-retention improvement. A guarded rule limited to absent lexical evidence can cover at most 101 of 253 noisy dev non-NA instances (39.92\%), so it cannot meet the present targets. Under the earlier 95\% clean-retention objective, logistic regression also failed its predeclared non-NA adoption gate. Changing the operating objective does not overturn that result.
+
+In the earlier logistic audit, non-NA out-of-fold ROC AUC was approximately 0.535. Overlap was constant zero; preferred order was nearly constant; boosts and uncertainty were sparse. The current features therefore provide limited discrimination within positive relations. The NA indicator and population composition can contribute to aggregate enrichment, so overall purity should not be presented alone.
+
+\subsection{Efficiency and Reproducibility}
+All revised filtering and fitting experiments run on CPU. JSON-exported model inference uses the Python standard library; fitting uses scikit-learn 1.7.2 with pinned dependencies. Thirty-two regression tests pass, and independent checks reproduce confusion counts, fold exclusions, scaler statistics, cached predictions, and exported scores. The release separates recorded aggregates from regenerated instance-level audit files.
+
+We withdraw the original claimed speedups over neural systems. Filtering inference, feature extraction, and neural training are different workloads measured on different hardware; their timings cannot establish a fair speed ratio. Throughput, if reported, must specify which stages are included and count relation instances consistently. No matched end-to-end neural comparison was performed.
+
+\section{Conclusion and Future Work}
+The corrected project provides an interpretable filtering pipeline and a small supervised extension, together with an explicit account of conversion errors and evaluation boundaries. Aggressive filtering achieves high noise recall by sacrificing most clean data. Although a small retained subset can be purer overall, non-NA discrimination remains weak and extreme recall becomes nearly total deletion. Recall, retained-set purity, clean retention, and remaining counts must be reported together.
+
+The next informative evidence would be an unseen evaluation population and matched downstream relation-classifier retraining. More complex architectures are not required to make the present project internally consistent, and no downstream gain is claimed without such a study.
+
+\section*{Limitations}
+Strict unique-span validation excludes a substantial population and may bias evaluation. Surface identities do not resolve aliases or homonyms. Lexical and positional features cannot robustly handle paraphrase, negation scope, or discourse. The logistic extension requires labeled examples and is not fully training-free. Repeated inspection of dev/test prevents claims of independent generalization; no fresh external evaluation or confidence intervals establish statistical superiority. The high-recall presets can empty bags and relations and may leave too little supervision for training. No relation extractor was retrained on the retained corpus, so comparisons with ARNOR or BERT and claims of improved downstream extraction are unsupported.
+
+\appendix
+\section{Final Configurations and Audit Trail}
+The exported presets have $(C,t_{\mathrm{NA}},t_{\mathrm{non\mbox{-}NA}})$ equal to $(10,0.15,0.15)$ for target 90\%, $(0.01,0.15,0.16)$ for target 95\%, and $(0.1,0.12,0.07)$ for target 99\%. These are separate fitted models, so their numeric cutoffs are not directly interchangeable. Each JSON contains feature order, scaler parameters, weights, intercept, and thresholds. No single preset is automatically promoted as the best model.
+
+The original 50.42\% test noise F1 is withdrawn as a corrected benchmark result because it depends on the defective pipeline. The old score histograms and framework image are preserved in the source archive but are not used as evidence for this revised pipeline. Primary records are \texttt{results/recall\_frontier\_20261014/} (protocol, results, frozen configurations, verification, and per-instance decisions), together with the earlier logistic fitting audit. The original repository is \url{https://github.com/LewisZZZ-Zhang/NLP_Final_Project}; the corrected release must be identified by its own version when published.
+
+\bibliography{custom}
+\end{document}
