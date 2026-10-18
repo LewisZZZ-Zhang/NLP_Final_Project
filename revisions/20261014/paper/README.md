@@ -1,7 +1,10 @@
-# Revised course paper
+# Paper
 
-The PDF was compiled in the original Overleaf project after updating latex/acl_latex.tex. Author attribution and ACL layout are preserved. Original source was archived before editing. This is a post-course revision prepared by Zijun Wu for review.
+- [PDF](NLP_Overleaf_Revised.pdf)
+- [LaTeX source](latex/acl_latex.tex)
 
-To compile locally, set paper/latex as the working directory, use pdfLaTeX and BibTeX on acl_latex.tex, then run pdfLaTeX twice. The bundled template files retain their original notices. Legacy score figures are no longer used by the revised document.
+Project team: Zijun Wu, Tianchen Xie, and Tianluo Zhang.
 
-Overleaf compilation: 0 errors, 0 warnings; six underfull box informational notices. All six PDF pages were rendered and checked. Downloaded source exactly matches the uploaded revision.
+The paper describes interpretable rule features, L2 logistic filtering, sentence-grouped evaluation, and the trade-off between noise recall and retained clean data.
+
+To compile locally, use `paper/latex/` as the working directory. Run pdfLaTeX and BibTeX on `acl_latex.tex`, then run pdfLaTeX twice. The bundled template files retain their original notices.

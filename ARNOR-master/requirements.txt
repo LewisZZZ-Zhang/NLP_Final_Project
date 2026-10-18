@@ -1,0 +1,5 @@
+python=3.11
+numpy==2.3.5
+tensorflow==2.20.0
+nltk
+tqdm 
