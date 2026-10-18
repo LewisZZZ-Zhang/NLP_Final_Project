@@ -1,0 +1,38 @@
+test_can_empty_bag (test_bag_rejection.BagRejectionTests.test_can_empty_bag) ... ok
+test_fit_retention_and_coverage (test_bag_rejection.BagRejectionTests.test_fit_retention_and_coverage) ... ok
+test_na_unchanged (test_bag_rejection.BagRejectionTests.test_na_unchanged) ... ok
+test_partial_bag (test_bag_rejection.BagRejectionTests.test_partial_bag) ... ok
+test_protect_evidence_and_high_score (test_bag_rejection.BagRejectionTests.test_protect_evidence_and_high_score) ... ok
+test_reject_singleton (test_bag_rejection.BagRejectionTests.test_reject_singleton) ... ok
+test_unguarded_can_drop_lexical (test_bag_rejection.BagRejectionTests.test_unguarded_can_drop_lexical) ... ok
+test_bias_na (test_cleanup.CleanupTests.test_bias_na) ... ok
+test_boundary (test_cleanup.CleanupTests.test_boundary) ... ok
+test_conversion_identity (test_cleanup.CleanupTests.test_conversion_identity) ... 2 invalid/ambiguous records quarantined; inspect input validation_status and candidate_spans
+ok
+test_legacy_rejected (test_cleanup.CleanupTests.test_legacy_rejected) ... ok
+test_metrics (test_cleanup.CleanupTests.test_metrics) ... ok
+test_noise_types (test_cleanup.CleanupTests.test_noise_types) ... ok
+test_singleton_allzero (test_cleanup.CleanupTests.test_singleton_allzero) ... ok
+test_softmax_bound (test_cleanup.CleanupTests.test_softmax_bound) ... ok
+test_spans (test_cleanup.CleanupTests.test_spans) ... ok
+test_invalid_feature (test_logistic_filter.LogisticInferenceTests.test_invalid_feature) ... ok
+test_scaling_and_equality (test_logistic_filter.LogisticInferenceTests.test_scaling_and_equality) ... ok
+test_schema_excludes_manual_score (test_logistic_filter.LogisticInferenceTests.test_schema_excludes_manual_score) ... ok
+test_score_and_group_threshold (test_logistic_filter.LogisticInferenceTests.test_score_and_group_threshold) ... ok
+test_stable_sigmoid (test_logistic_filter.LogisticInferenceTests.test_stable_sigmoid) ... ok
+test_export_matches_pipeline_and_scaler_training_only (test_logistic_filter.LogisticTrainingTests.test_export_matches_pipeline_and_scaler_training_only) ... ok
+test_dropall_boundary (test_recall_frontier.RecallFrontierTests.test_dropall_boundary) ... ok
+test_high_recall_protects_clean_when_possible (test_recall_frontier.RecallFrontierTests.test_high_recall_protects_clean_when_possible) ... ok
+test_raw_direction (test_recall_frontier.RecallFrontierTests.test_raw_direction) ... ok
+test_dual_and_partition_fallback (test_simple_variants.SimpleVariantTests.test_dual_and_partition_fallback) ... ok
+test_entity_mask (test_simple_variants.SimpleVariantTests.test_entity_mask) ... ok
+test_fit_no_label_leak (test_simple_variants.SimpleVariantTests.test_fit_no_label_leak) ... ok
+test_local_real_evidence (test_simple_variants.SimpleVariantTests.test_local_real_evidence) ... ok
+test_nonlexical_unchanged (test_simple_variants.SimpleVariantTests.test_nonlexical_unchanged) ... ok
+test_reverse_and_overlap (test_simple_variants.SimpleVariantTests.test_reverse_and_overlap) ... ok
+test_unrelated_far_keyword (test_simple_variants.SimpleVariantTests.test_unrelated_far_keyword) ... ok
+
+----------------------------------------------------------------------
+Ran 32 tests in 0.022s
+
+OK

@@ -1,0 +1,24 @@
+{
+  "targets": [
+    0.9,
+    0.95,
+    0.99
+  ],
+  "meaning": "noise recall goals, not clean-retention targets or classifier cutoffs",
+  "objective": "Within each NA/non-NA group maximize retained clean fraction subject to fitted noise recall >= target; no minimum clean retention, no min_keep, no class coverage constraint",
+  "selection": "For LR, select C maximizing non-NA clean retention then non-NA purity then lower inner log loss then smaller C. Group thresholds selected separately. Report all targets; no single winner or test-driven choice.",
+  "validation": "reuse audited inner OOF predictions from prior LR training (unchanged features/training); reselect C/cutoffs only on outer train inner predictions; refit selected C on outer train; same sentence outer folds; full-dev configuration frozen before diagnostic tests",
+  "baselines": [
+    "raw threshold with min_keep=0",
+    "keep-all",
+    "drop-all"
+  ],
+  "limitations": "Exploratory reuse of previously inspected dev/test. No new pristine test. High recall can sacrifice almost all clean data.",
+  "source_hashes": {
+    "scripts/recall_frontier.py": "1b8411f003c71d8c620abf44a2c24b5457f7a2b26fc2c6849e4e7f1f846a20cf",
+    "filter/model.py": "6ae4cbef4a686814e7395817fa5ef556a057438a8cb031542e7c4b8e8363dbcf",
+    "scripts/logistic_experiment.py": "c6e62adf0a6c28cce6ac64a3eb4021af2640461fd8907864f9799256605331a5",
+    "results/logistic_20261014/protocol.json": "ad70edb9dd4f5bf5f08b7ab2b45d25e01c65767e1ac2f59a0a1026e546092308",
+    "results/logistic_20261014/verification.json": "591a540d13e368a5272e60d9897468ec9bd94fc7a2fcc28248ffa002b17eac7e"
+  }
+}

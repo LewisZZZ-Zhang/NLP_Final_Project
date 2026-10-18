@@ -1,0 +1,7 @@
+{
+  "unit_tests": 32,
+  "fresh_copy_full_pipeline": true,
+  "all_recall_aggregate_results_exactly_match": true,
+  "source_commit": "951fe90",
+  "note": "Rebuilt from raw dev/test/test_noise data with baseline, logistic, recall experiments and independent verification."
+}
